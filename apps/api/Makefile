@@ -1,4 +1,4 @@
-.PHONY: run build tidy fmt vet test
+.PHONY: run build tidy fmt vet test sqlc migrate-up
 
 run:
 	go run ./cmd/server
@@ -17,3 +17,9 @@ vet:
 
 test:
 	go test ./...
+
+sqlc:
+	sqlc generate
+
+migrate-up:
+	go run ./cmd/migrate up
