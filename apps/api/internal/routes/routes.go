@@ -7,15 +7,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
+	"github.com/shagun101pareek/forgeflow/internal/auth"
+	"github.com/shagun101pareek/forgeflow/sql/generated"
 )
 
 type Dependencies struct {
-	Log     zerolog.Logger
-	DB      *pgxpool.Pool
-	Redis   *redis.Client
-	AppEnv  string
-	DBReady bool
-	RedisOK bool
+	Log       zerolog.Logger
+	DB        *pgxpool.Pool
+	Redis     *redis.Client
+	AppEnv    string
+	JWTSecret string
+	DBReady   bool
+	RedisOK   bool
 }
 
 func Register(app *fiber.App, deps Dependencies) {
@@ -60,4 +63,14 @@ func Register(app *fiber.App, deps Dependencies) {
 			"version": "v1",
 		})
 	})
+
+	var queries *db.Queries
+	if deps.DB != nil {
+		queries = db.New(deps.DB)
+	}
+
+	authHandler := auth.NewHandler(queries, deps.JWTSecret)
+	v1.Post("/auth/signup", authHandler.Signup)
+	v1.Post("/auth/login", authHandler.Login)
+	v1.Get("/auth/me", auth.RequireAuth(deps.JWTSecret), authHandler.Me)
 }
