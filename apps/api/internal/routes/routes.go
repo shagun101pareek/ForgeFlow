@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/shagun101pareek/forgeflow/internal/auth"
+	"github.com/shagun101pareek/forgeflow/internal/projects"
 	"github.com/shagun101pareek/forgeflow/sql/generated"
 )
 
@@ -73,4 +74,12 @@ func Register(app *fiber.App, deps Dependencies) {
 	v1.Post("/auth/signup", authHandler.Signup)
 	v1.Post("/auth/login", authHandler.Login)
 	v1.Get("/auth/me", auth.RequireAuth(deps.JWTSecret), authHandler.Me)
+
+	projectHandler := projects.NewHandler(queries)
+	protected := v1.Group("/projects", auth.RequireAuth(deps.JWTSecret))
+	protected.Get("/", projectHandler.List)
+	protected.Post("/", projectHandler.Create)
+	protected.Get("/:id", projectHandler.Get)
+	protected.Patch("/:id", projectHandler.Update)
+	protected.Delete("/:id", projectHandler.Delete)
 }
