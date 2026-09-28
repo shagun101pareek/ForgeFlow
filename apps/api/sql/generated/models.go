@@ -5,10 +5,20 @@
 package db
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type Generation struct {
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Prompt        string
+	Specification json.RawMessage
+	Files         json.RawMessage
+	CreatedAt     time.Time
+}
 
 type Project struct {
 	ID          uuid.UUID

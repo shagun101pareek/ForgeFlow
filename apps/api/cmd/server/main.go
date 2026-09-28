@@ -12,6 +12,7 @@ import (
 	"github.com/shagun101pareek/forgeflow/internal/cache"
 	"github.com/shagun101pareek/forgeflow/internal/config"
 	"github.com/shagun101pareek/forgeflow/internal/database"
+	"github.com/shagun101pareek/forgeflow/internal/generation"
 	"github.com/shagun101pareek/forgeflow/internal/logger"
 	"github.com/shagun101pareek/forgeflow/internal/routes"
 )
@@ -27,9 +28,17 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	provider, err := generation.NewProvider(cfg.GenerationProvider, cfg.OpenAIKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to configure generation: %v\n", err)
+		os.Exit(1)
+	}
+
 	deps := routes.Dependencies{
-		Log:    log,
-		AppEnv: cfg.AppEnv,
+		Log:       log,
+		AppEnv:    cfg.AppEnv,
+		JWTSecret: cfg.JWTSecret,
+		Generator: provider,
 	}
 
 	db, err := database.NewPostgresPool(ctx, cfg.DatabaseURL)
@@ -52,8 +61,8 @@ func main() {
 
 	app := fiber.New(fiber.Config{
 		AppName:      "ForgeFlow API",
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	})
 
