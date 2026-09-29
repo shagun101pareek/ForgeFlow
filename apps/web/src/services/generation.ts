@@ -17,11 +17,14 @@ export type UISpecification = {
   }>;
 };
 
+export type GenerationStatus = "queued" | "running" | "completed" | "failed";
+
 export type GenerationResult = {
   id: string;
   projectId: string;
   prompt: string;
-  status: "completed";
+  status: GenerationStatus;
+  error: string;
   specification: UISpecification;
   files: GeneratedFile[];
   createdAt: string;
@@ -30,14 +33,39 @@ export type GenerationResult = {
 export type GenerationSummary = {
   id: string;
   prompt: string;
+  status: GenerationStatus;
   createdAt: string;
 };
 
-export async function startGeneration(input: GenerationPromptInput) {
-  const { data } = await api.post<GenerationResult>("/api/v1/generation", input, {
-    timeout: 120_000,
-  });
+export function generationIsActive(status: GenerationStatus | undefined) {
+  return status === "queued" || status === "running";
+}
+
+export async function enqueueGeneration(input: GenerationPromptInput) {
+  const { data } = await api.post<GenerationResult>("/api/v1/generation", input);
   return data;
+}
+
+export async function startGeneration(input: GenerationPromptInput) {
+  const queued = await enqueueGeneration(input);
+  return waitForGeneration(input.projectId, queued.id);
+}
+
+export async function waitForGeneration(projectId: string, generationId: string) {
+  const deadline = Date.now() + 120_000;
+  for (;;) {
+    const record = await getGeneration(projectId, generationId);
+    if (record.status === "completed") {
+      return record;
+    }
+    if (record.status === "failed") {
+      throw new Error(record.error || "Could not generate the interface");
+    }
+    if (Date.now() >= deadline) {
+      throw new Error("Generation timed out");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
 }
 
 export async function listGenerations(projectId: string) {

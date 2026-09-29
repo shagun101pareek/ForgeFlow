@@ -1,10 +1,37 @@
 -- name: CreateGeneration :one
-INSERT INTO generations (project_id, prompt, specification, files)
-VALUES ($1, $2, $3, $4)
-RETURNING id, project_id, prompt, specification, files, created_at;
+INSERT INTO generations (project_id, prompt, specification, files, status)
+VALUES ($1, $2, '{}'::jsonb, '[]'::jsonb, 'queued')
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message;
+
+-- name: SetGenerationStatus :exec
+UPDATE generations
+SET status = $2
+WHERE id = $1 AND status = 'queued';
+
+-- name: CompleteGeneration :exec
+UPDATE generations
+SET status = 'completed',
+    specification = $2,
+    files = $3,
+    error_message = ''
+WHERE id = $1 AND status = 'running';
+
+-- name: FailGeneration :exec
+UPDATE generations
+SET status = 'failed',
+    error_message = $2
+WHERE id = $1 AND status IN ('queued', 'running');
+
+-- name: FailStaleGenerations :exec
+UPDATE generations
+SET status = 'failed',
+    error_message = 'Generation timed out'
+WHERE project_id = $1
+  AND status IN ('queued', 'running')
+  AND created_at < now() - interval '2 minutes';
 
 -- name: GetLatestGenerationForUserProject :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
@@ -12,14 +39,14 @@ ORDER BY g.created_at DESC
 LIMIT 1;
 
 -- name: ListGenerationsForUserProject :many
-SELECT g.id, g.prompt, g.created_at
+SELECT g.id, g.prompt, g.status, g.created_at
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
 ORDER BY g.created_at DESC;
 
 -- name: GetGenerationForUser :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.id = $1 AND g.project_id = $2 AND p.user_id = $3;

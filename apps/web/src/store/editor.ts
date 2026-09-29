@@ -28,6 +28,7 @@ type EditorState = {
   prompt: string;
   specification: UISpecification | null;
   generationId: string | null;
+  generationError: string | null;
   setFiles: (files: EditorFile[]) => void;
   setActiveFile: (path: string | null) => void;
   updateFile: (path: string, code: string) => void;
@@ -45,6 +46,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   prompt: "",
   specification: null,
   generationId: null,
+  generationError: null,
   setFiles: (files) =>
     set({
       files,
@@ -60,7 +62,21 @@ export const useEditorStore = create<EditorState>((set) => ({
   setActivePage: (id) => set({ activePageId: id }),
   setPrompt: (prompt) => set({ prompt }),
   loadGeneration: (generation) => {
-    const pages = generation.specification.pages.map((page) => ({
+    if (generation.status === "failed") {
+      set({
+        generationId: generation.id,
+        prompt: generation.prompt,
+        specification: null,
+        files: [],
+        activeFilePath: null,
+        generationError: generation.error || "Generation failed",
+      });
+      return;
+    }
+    if (generation.status !== "completed") {
+      return;
+    }
+    const pages = (generation.specification.pages ?? []).map((page) => ({
       id: page.route === "/" ? "home" : page.route.replace(/^\//, "").replaceAll("/", "-"),
       name: page.name,
       route: page.route,
@@ -73,6 +89,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       activeFilePath: generation.files[0]?.path ?? null,
       pages: pages.length > 0 ? pages : defaultEditorPages,
       activePageId: pages[0]?.id ?? defaultEditorPages[0].id,
+      generationError: null,
     });
   },
   resetWorkspace: () =>
@@ -84,5 +101,6 @@ export const useEditorStore = create<EditorState>((set) => ({
       prompt: "",
       specification: null,
       generationId: null,
+      generationError: null,
     }),
 }));
