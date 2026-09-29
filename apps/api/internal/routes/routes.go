@@ -27,9 +27,10 @@ type Dependencies struct {
 func Register(app *fiber.App, deps Dependencies) {
 	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowOrigins:  "*",
+		AllowHeaders:  "Origin, Content-Type, Accept, Authorization",
+		ExposeHeaders: "Content-Disposition",
+		AllowMethods:  "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 	}))
 
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -83,6 +84,7 @@ func Register(app *fiber.App, deps Dependencies) {
 	protected.Get("/", projectHandler.List)
 	protected.Post("/", projectHandler.Create)
 	protected.Get("/:id/generations/latest", generationHandler.Latest)
+	protected.Get("/:id/generations/:generationId/export", generationHandler.Export)
 	protected.Get("/:id/generations/:generationId", generationHandler.Get)
 	protected.Get("/:id/generations", generationHandler.List)
 	protected.Get("/:id", projectHandler.Get)
