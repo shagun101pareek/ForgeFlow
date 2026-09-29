@@ -3,6 +3,7 @@ package generation
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -145,6 +146,42 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not load generation")
 	}
 	return c.JSON(generationFromRow(row))
+}
+
+func (h *Handler) Export(c *fiber.Ctx) error {
+	queries, userID, projectID, ok := h.ownedProject(c)
+	if !ok {
+		return nil
+	}
+	generationID, err := uuid.Parse(c.Params("generationId"))
+	if err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid generation id")
+	}
+
+	row, err := queries.GetGenerationForUser(c.Context(), db.GetGenerationForUserParams{
+		ID:        generationID,
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return respond.Error(c, fiber.StatusNotFound, "generation not found")
+		}
+		return respond.Error(c, fiber.StatusInternalServerError, "could not load generation")
+	}
+	if row.Status != "completed" {
+		return respond.Error(c, fiber.StatusConflict, "generation is not ready to export")
+	}
+
+	record := generationFromRow(row)
+	body, filename, err := BuildZip(record.Specification.Project.Name, record.Files)
+	if err != nil {
+		return respond.Error(c, fiber.StatusConflict, "generation is not ready to export")
+	}
+
+	c.Set("Content-Type", "application/zip")
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	return c.Send(body)
 }
 
 func (h *Handler) ownedProject(c *fiber.Ctx) (*db.Queries, uuid.UUID, uuid.UUID, bool) {

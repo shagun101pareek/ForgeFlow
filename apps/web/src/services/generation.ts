@@ -89,6 +89,23 @@ export async function getLatestGeneration(projectId: string) {
   }
 }
 
+export async function downloadGeneration(projectId: string, generationId: string) {
+  const response = await api.get<Blob>(
+    `/api/v1/projects/${projectId}/generations/${generationId}/export`,
+    { responseType: "blob" },
+  );
+  const match = /filename="([^"]+)"/.exec(
+    response.headers["content-disposition"] ?? "",
+  );
+  const filename = match?.[1] ?? "forgeflow.zip";
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function getGeneration(projectId: string, generationId: string) {
   const { data } = await api.get<GenerationResult>(
     `/api/v1/projects/${projectId}/generations/${generationId}`,

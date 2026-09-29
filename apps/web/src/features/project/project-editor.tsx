@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
 import type { GenerationPromptInput } from "@/lib/validators";
 import {
+  downloadGeneration,
   enqueueGeneration,
   generationIsActive,
   getGeneration,
@@ -50,6 +51,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const activePage = pages.find((page) => page.id === activePageId) ?? pages[0];
   const [draftName, setDraftName] = useState<string | null>(null);
   const [openingVersionId, setOpeningVersionId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
 
@@ -168,6 +170,21 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     }
   }
 
+  async function download() {
+    if (!generationId || files.length === 0 || downloading) {
+      toast("Generate a UI first");
+      return;
+    }
+    setDownloading(true);
+    try {
+      await downloadGeneration(projectId, generationId);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not download this generation"));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   function showPreview() {
     if (files.length === 0) {
       toast("Generate a UI first");
@@ -236,6 +253,14 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         <div className="flex items-center gap-2">
           <Button variant="outline" type="button" onClick={showPreview}>
             Preview
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => void download()}
+            disabled={downloading || showGenerating || files.length === 0}
+          >
+            {downloading ? "Downloading…" : "Download"}
           </Button>
           <Button type="button" onClick={generate} disabled={showGenerating}>
             {showGenerating ? "Generating…" : "Generate"}
