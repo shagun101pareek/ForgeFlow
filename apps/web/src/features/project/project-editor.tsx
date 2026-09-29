@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -10,11 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
+import type { GenerationPromptInput } from "@/lib/validators";
 import {
+  enqueueGeneration,
+  generationIsActive,
   getGeneration,
   getLatestGeneration,
   listGenerations,
-  startGeneration,
+  waitForGeneration,
 } from "@/services/generation";
 import { getProject, updateProject } from "@/services/projects";
 import { useEditorStore } from "@/store/editor";
@@ -38,6 +42,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const files = useEditorStore((state) => state.files);
   const specification = useEditorStore((state) => state.specification);
   const generationId = useEditorStore((state) => state.generationId);
+  const generationError = useEditorStore((state) => state.generationError);
   const setActivePage = useEditorStore((state) => state.setActivePage);
   const setPrompt = useEditorStore((state) => state.setPrompt);
   const loadGeneration = useEditorStore((state) => state.loadGeneration);
@@ -51,11 +56,17 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const versions = useQuery({
     queryKey: ["generations", projectId],
     queryFn: () => listGenerations(projectId),
+    refetchInterval: (query) =>
+      query.state.data?.some((version) => generationIsActive(version.status))
+        ? 500
+        : false,
   });
   const latest = useQuery({
     queryKey: ["generation-latest", projectId],
     queryFn: () => getLatestGeneration(projectId),
     retry: false,
+    refetchInterval: (query) =>
+      generationIsActive(query.state.data?.status) ? 500 : false,
   });
 
   useEffect(() => {
@@ -70,10 +81,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     if (loadedProject.current === projectId) {
       return;
     }
-    loadedProject.current = projectId;
-    if (latest.data) {
-      loadGeneration(latest.data);
+    if (!latest.data || generationIsActive(latest.data.status)) {
+      return;
     }
+    loadedProject.current = projectId;
+    loadGeneration(latest.data);
   }, [
     latest.data,
     latest.isFetching,
@@ -106,7 +118,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   }
 
   const generation = useMutation({
-    mutationFn: startGeneration,
+    mutationFn: async (input: GenerationPromptInput) => {
+      const queued = await enqueueGeneration(input);
+      await queryClient.invalidateQueries({ queryKey: ["generations", projectId] });
+      return waitForGeneration(input.projectId, queued.id);
+    },
     onSuccess: (result) => {
       loadedProject.current = projectId;
       loadGeneration(result);
@@ -115,7 +131,12 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       toast.success("Preview is ready");
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, "Could not generate the interface"));
+      void queryClient.invalidateQueries({ queryKey: ["generations", projectId] });
+      const message =
+        error instanceof Error && !axios.isAxiosError(error) && error.message
+          ? error.message
+          : getErrorMessage(error, "Could not generate the interface");
+      toast.error(message);
     },
   });
 
@@ -135,6 +156,9 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     setOpeningVersionId(id);
     try {
       const record = await getGeneration(projectId, id);
+      if (generationIsActive(record.status)) {
+        return;
+      }
       loadedProject.current = projectId;
       loadGeneration(record);
     } catch (error) {
@@ -154,6 +178,10 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       block: "nearest",
     });
   }
+
+  const showGenerating =
+    generation.isPending ||
+    (generationIsActive(latest.data?.status) && files.length === 0);
 
   const activeSections =
     specification?.pages.find((page) => page.route === activePage?.route)
@@ -209,8 +237,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <Button variant="outline" type="button" onClick={showPreview}>
             Preview
           </Button>
-          <Button type="button" onClick={generate} disabled={generation.isPending}>
-            {generation.isPending ? "Generating…" : "Generate"}
+          <Button type="button" onClick={generate} disabled={showGenerating}>
+            {showGenerating ? "Generating…" : "Generate"}
           </Button>
         </div>
       </header>
@@ -278,6 +306,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
                     >
                       {label}
                       <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {versionStatusLabel(version.status)}
                         {new Date(version.createdAt).toLocaleString()}
                       </span>
                     </button>
@@ -292,24 +321,26 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             id="forgeflow-preview"
             className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-xl border"
           >
-            {generation.isPending || openingVersionId ? (
+            {showGenerating || openingVersionId ? (
               <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
                 {openingVersionId ? "Opening version…" : "Generating the interface…"}
               </div>
             ) : null}
-            {!generation.isPending && !openingVersionId && files.length > 0 ? (
+            {!showGenerating && !openingVersionId && files.length > 0 ? (
               <LivePreview
                 key={`${generationId ?? "draft"}:${activePage?.route ?? "/"}`}
                 files={files}
                 route={activePage?.route ?? "/"}
               />
             ) : null}
-            {!generation.isPending && !openingVersionId && files.length === 0 ? (
+            {!showGenerating && !openingVersionId && files.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-                <p className="text-sm font-medium">{activePage?.name}</p>
+                <p className="text-sm font-medium">
+                  {generationError ? "Generation failed" : activePage?.name}
+                </p>
                 <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                  Describe an interface below, then generate it. The preview
-                  will run here.
+                  {generationError ??
+                    "Describe an interface below, then generate it. The preview will run here."}
                 </p>
               </div>
             ) : null}
@@ -364,4 +395,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       </div>
     </div>
   );
+}
+
+function versionStatusLabel(status: string) {
+  if (status === "completed") {
+    return "";
+  }
+  return `${status.charAt(0).toUpperCase()}${status.slice(1)} · `;
 }

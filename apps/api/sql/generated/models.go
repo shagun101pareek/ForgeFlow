@@ -18,6 +18,8 @@ type Generation struct {
 	Specification json.RawMessage
 	Files         json.RawMessage
 	CreatedAt     time.Time
+	Status        string
+	ErrorMessage  string
 }
 
 type Project struct {

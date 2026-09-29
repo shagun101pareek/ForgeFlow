@@ -1,7 +1,6 @@
 package generation
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -63,55 +62,17 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not load project")
 	}
 
-	ctx, cancel := context.WithTimeout(c.Context(), 90*time.Second)
-	defer cancel()
-
-	spec, err := h.generator.GenerateSpec(ctx, project.Name, prompt)
-	if err != nil {
-		var modelErr *ModelError
-		if errors.As(err, &modelErr) {
-			return respond.Error(c, fiber.StatusBadGateway, modelErr.Message)
-		}
-		if strings.Contains(err.Error(), "api key is not configured") {
-			return respond.Error(c, fiber.StatusServiceUnavailable, "OpenAI API key is not configured")
-		}
-		return respond.Error(c, fiber.StatusBadGateway, "could not generate a UI specification")
-	}
-
-	spec, err = Normalize(spec, project.Name)
-	if err != nil {
-		return respond.Error(c, fiber.StatusBadGateway, "could not generate a UI specification")
-	}
-
-	files := GenerateFiles(spec)
-	specJSON, err := json.Marshal(spec)
-	if err != nil {
-		return respond.Error(c, fiber.StatusInternalServerError, "could not save generation")
-	}
-	filesJSON, err := json.Marshal(files)
-	if err != nil {
-		return respond.Error(c, fiber.StatusInternalServerError, "could not save generation")
-	}
-
 	row, err := h.queries.CreateGeneration(c.Context(), db.CreateGenerationParams{
-		ProjectID:     project.ID,
-		Prompt:        prompt,
-		Specification: specJSON,
-		Files:         filesJSON,
+		ProjectID: project.ID,
+		Prompt:    prompt,
 	})
 	if err != nil {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not save generation")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(generationResponse{
-		ID:            row.ID.String(),
-		ProjectID:     row.ProjectID.String(),
-		Prompt:        row.Prompt,
-		Status:        "completed",
-		Specification: spec,
-		Files:         files,
-		CreatedAt:     row.CreatedAt.UTC().Format(time.RFC3339),
-	})
+	go h.runGeneration(row.ID, project.Name, prompt)
+
+	return c.Status(fiber.StatusAccepted).JSON(generationFromRow(row))
 }
 
 func (h *Handler) List(c *fiber.Ctx) error {
@@ -119,6 +80,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	if !ok {
 		return nil
 	}
+	_ = queries.FailStaleGenerations(c.Context(), projectID)
 
 	rows, err := queries.ListGenerationsForUserProject(c.Context(), db.ListGenerationsForUserProjectParams{
 		ProjectID: projectID,
@@ -133,6 +95,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		items = append(items, generationSummary{
 			ID:        row.ID.String(),
 			Prompt:    row.Prompt,
+			Status:    row.Status,
 			CreatedAt: row.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
@@ -144,6 +107,7 @@ func (h *Handler) Latest(c *fiber.Ctx) error {
 	if !ok {
 		return nil
 	}
+	_ = queries.FailStaleGenerations(c.Context(), projectID)
 
 	row, err := queries.GetLatestGenerationForUserProject(c.Context(), db.GetLatestGenerationForUserProjectParams{
 		ProjectID: projectID,
@@ -163,6 +127,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 	if !ok {
 		return nil
 	}
+	_ = queries.FailStaleGenerations(c.Context(), projectID)
 	generationID, err := uuid.Parse(c.Params("generationId"))
 	if err != nil {
 		return respond.Error(c, fiber.StatusBadRequest, "invalid generation id")
@@ -214,6 +179,7 @@ func (h *Handler) ownedProject(c *fiber.Ctx) (*db.Queries, uuid.UUID, uuid.UUID,
 type generationSummary struct {
 	ID        string `json:"id"`
 	Prompt    string `json:"prompt"`
+	Status    string `json:"status"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -222,6 +188,7 @@ type generationResponse struct {
 	ProjectID     string `json:"projectId"`
 	Prompt        string `json:"prompt"`
 	Status        string `json:"status"`
+	Error         string `json:"error"`
 	Specification Spec   `json:"specification"`
 	Files         []File `json:"files"`
 	CreatedAt     string `json:"createdAt"`
@@ -230,6 +197,9 @@ type generationResponse struct {
 func generationFromRow(row db.Generation) generationResponse {
 	var spec Spec
 	_ = json.Unmarshal(row.Specification, &spec)
+	if spec.Pages == nil {
+		spec.Pages = []Page{}
+	}
 	var files []File
 	_ = json.Unmarshal(row.Files, &files)
 	if files == nil {
@@ -239,7 +209,8 @@ func generationFromRow(row db.Generation) generationResponse {
 		ID:            row.ID.String(),
 		ProjectID:     row.ProjectID.String(),
 		Prompt:        row.Prompt,
-		Status:        "completed",
+		Status:        row.Status,
+		Error:         row.ErrorMessage,
 		Specification: spec,
 		Files:         files,
 		CreatedAt:     row.CreatedAt.UTC().Format(time.RFC3339),

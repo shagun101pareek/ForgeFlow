@@ -13,26 +13,39 @@ import (
 	"github.com/google/uuid"
 )
 
-const createGeneration = `-- name: CreateGeneration :one
-INSERT INTO generations (project_id, prompt, specification, files)
-VALUES ($1, $2, $3, $4)
-RETURNING id, project_id, prompt, specification, files, created_at
+const completeGeneration = `-- name: CompleteGeneration :exec
+UPDATE generations
+SET status = 'completed',
+    specification = $2,
+    files = $3,
+    error_message = ''
+WHERE id = $1 AND status = 'running'
 `
 
-type CreateGenerationParams struct {
-	ProjectID     uuid.UUID
-	Prompt        string
+type CompleteGenerationParams struct {
+	ID            uuid.UUID
 	Specification json.RawMessage
 	Files         json.RawMessage
 }
 
+func (q *Queries) CompleteGeneration(ctx context.Context, arg CompleteGenerationParams) error {
+	_, err := q.db.Exec(ctx, completeGeneration, arg.ID, arg.Specification, arg.Files)
+	return err
+}
+
+const createGeneration = `-- name: CreateGeneration :one
+INSERT INTO generations (project_id, prompt, specification, files, status)
+VALUES ($1, $2, '{}'::jsonb, '[]'::jsonb, 'queued')
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message
+`
+
+type CreateGenerationParams struct {
+	ProjectID uuid.UUID
+	Prompt    string
+}
+
 func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationParams) (Generation, error) {
-	row := q.db.QueryRow(ctx, createGeneration,
-		arg.ProjectID,
-		arg.Prompt,
-		arg.Specification,
-		arg.Files,
-	)
+	row := q.db.QueryRow(ctx, createGeneration, arg.ProjectID, arg.Prompt)
 	var i Generation
 	err := row.Scan(
 		&i.ID,
@@ -41,12 +54,45 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 		&i.Specification,
 		&i.Files,
 		&i.CreatedAt,
+		&i.Status,
+		&i.ErrorMessage,
 	)
 	return i, err
 }
 
+const failGeneration = `-- name: FailGeneration :exec
+UPDATE generations
+SET status = 'failed',
+    error_message = $2
+WHERE id = $1 AND status IN ('queued', 'running')
+`
+
+type FailGenerationParams struct {
+	ID           uuid.UUID
+	ErrorMessage string
+}
+
+func (q *Queries) FailGeneration(ctx context.Context, arg FailGenerationParams) error {
+	_, err := q.db.Exec(ctx, failGeneration, arg.ID, arg.ErrorMessage)
+	return err
+}
+
+const failStaleGenerations = `-- name: FailStaleGenerations :exec
+UPDATE generations
+SET status = 'failed',
+    error_message = 'Generation timed out'
+WHERE project_id = $1
+  AND status IN ('queued', 'running')
+  AND created_at < now() - interval '2 minutes'
+`
+
+func (q *Queries) FailStaleGenerations(ctx context.Context, projectID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, failStaleGenerations, projectID)
+	return err
+}
+
 const getGenerationForUser = `-- name: GetGenerationForUser :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.id = $1 AND g.project_id = $2 AND p.user_id = $3
@@ -68,12 +114,14 @@ func (q *Queries) GetGenerationForUser(ctx context.Context, arg GetGenerationFor
 		&i.Specification,
 		&i.Files,
 		&i.CreatedAt,
+		&i.Status,
+		&i.ErrorMessage,
 	)
 	return i, err
 }
 
 const getLatestGenerationForUserProject = `-- name: GetLatestGenerationForUserProject :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
@@ -96,12 +144,14 @@ func (q *Queries) GetLatestGenerationForUserProject(ctx context.Context, arg Get
 		&i.Specification,
 		&i.Files,
 		&i.CreatedAt,
+		&i.Status,
+		&i.ErrorMessage,
 	)
 	return i, err
 }
 
 const listGenerationsForUserProject = `-- name: ListGenerationsForUserProject :many
-SELECT g.id, g.prompt, g.created_at
+SELECT g.id, g.prompt, g.status, g.created_at
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
@@ -116,6 +166,7 @@ type ListGenerationsForUserProjectParams struct {
 type ListGenerationsForUserProjectRow struct {
 	ID        uuid.UUID
 	Prompt    string
+	Status    string
 	CreatedAt time.Time
 }
 
@@ -128,7 +179,12 @@ func (q *Queries) ListGenerationsForUserProject(ctx context.Context, arg ListGen
 	var items []ListGenerationsForUserProjectRow
 	for rows.Next() {
 		var i ListGenerationsForUserProjectRow
-		if err := rows.Scan(&i.ID, &i.Prompt, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Prompt,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -137,4 +193,20 @@ func (q *Queries) ListGenerationsForUserProject(ctx context.Context, arg ListGen
 		return nil, err
 	}
 	return items, nil
+}
+
+const setGenerationStatus = `-- name: SetGenerationStatus :exec
+UPDATE generations
+SET status = $2
+WHERE id = $1 AND status = 'queued'
+`
+
+type SetGenerationStatusParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+func (q *Queries) SetGenerationStatus(ctx context.Context, arg SetGenerationStatusParams) error {
+	_, err := q.db.Exec(ctx, setGenerationStatus, arg.ID, arg.Status)
+	return err
 }
