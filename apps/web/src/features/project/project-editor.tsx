@@ -21,6 +21,7 @@ import {
   listGenerations,
   waitForGeneration,
 } from "@/services/generation";
+import { SourceView } from "@/features/preview/source-view";
 import { getProject, updateProject } from "@/services/projects";
 import { useEditorStore } from "@/store/editor";
 
@@ -44,6 +45,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const specification = useEditorStore((state) => state.specification);
   const generationId = useEditorStore((state) => state.generationId);
   const generationError = useEditorStore((state) => state.generationError);
+  const activeFilePath = useEditorStore((state) => state.activeFilePath);
+  const setActiveFile = useEditorStore((state) => state.setActiveFile);
   const setActivePage = useEditorStore((state) => state.setActivePage);
   const setPrompt = useEditorStore((state) => state.setPrompt);
   const loadGeneration = useEditorStore((state) => state.loadGeneration);
@@ -52,6 +55,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [openingVersionId, setOpeningVersionId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
 
@@ -190,6 +194,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       toast("Generate a UI first");
       return;
     }
+    setCanvas("preview");
     document.getElementById("forgeflow-preview")?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -346,16 +351,45 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             id="forgeflow-preview"
             className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-xl border"
           >
+            {!showGenerating && !openingVersionId && files.length > 0 ? (
+              <div className="flex gap-1 border-b p-2">
+                <button
+                  type="button"
+                  onClick={() => setCanvas("preview")}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    canvas === "preview" ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCanvas("source")}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    canvas === "source" ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  Source
+                </button>
+              </div>
+            ) : null}
             {showGenerating || openingVersionId ? (
               <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
                 {openingVersionId ? "Opening version…" : "Generating the interface…"}
               </div>
             ) : null}
-            {!showGenerating && !openingVersionId && files.length > 0 ? (
+            {!showGenerating && !openingVersionId && files.length > 0 && canvas === "preview" ? (
               <LivePreview
                 key={`${generationId ?? "draft"}:${activePage?.route ?? "/"}`}
                 files={files}
                 route={activePage?.route ?? "/"}
+              />
+            ) : null}
+            {!showGenerating && !openingVersionId && files.length > 0 && canvas === "source" ? (
+              <SourceView
+                files={files}
+                activePath={activeFilePath}
+                onSelect={setActiveFile}
               />
             ) : null}
             {!showGenerating && !openingVersionId && files.length === 0 ? (
