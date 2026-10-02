@@ -83,6 +83,7 @@ func Register(app *fiber.App, deps Dependencies) {
 	protected := v1.Group("/projects", auth.RequireAuth(deps.JWTSecret))
 	protected.Get("/", projectHandler.List)
 	protected.Post("/", projectHandler.Create)
+	protected.Post("/:id/generations", generationHandler.Save)
 	protected.Get("/:id/generations/latest", generationHandler.Latest)
 	protected.Get("/:id/generations/:generationId/export", generationHandler.Export)
 	protected.Get("/:id/generations/:generationId", generationHandler.Get)

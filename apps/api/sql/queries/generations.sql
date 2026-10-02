@@ -1,3 +1,8 @@
+-- name: SaveGeneration :one
+INSERT INTO generations (project_id, prompt, specification, files, status)
+VALUES ($1, $2, $3, $4, 'completed')
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message;
+
 -- name: CreateGeneration :one
 INSERT INTO generations (project_id, prompt, specification, files, status)
 VALUES ($1, $2, '{}'::jsonb, '[]'::jsonb, 'queued')

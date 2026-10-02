@@ -68,6 +68,18 @@ export async function waitForGeneration(projectId: string, generationId: string)
   }
 }
 
+export async function saveGeneration(
+  projectId: string,
+  generationId: string,
+  files: GeneratedFile[],
+) {
+  const { data } = await api.post<GenerationResult>(
+    `/api/v1/projects/${projectId}/generations`,
+    { generationId, files },
+  );
+  return data;
+}
+
 export async function listGenerations(projectId: string) {
   const { data } = await api.get<GenerationSummary[]>(
     `/api/v1/projects/${projectId}/generations`,

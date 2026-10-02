@@ -6,10 +6,12 @@ export function SourceView({
   files,
   activePath,
   onSelect,
+  onChange,
 }: {
   files: GeneratedFile[];
   activePath: string | null;
   onSelect: (path: string) => void;
+  onChange: (path: string, code: string) => void;
 }) {
   const active = files.find((file) => file.path === activePath) ?? files[0];
 
@@ -32,9 +34,17 @@ export function SourceView({
           );
         })}
       </div>
-      <pre className="min-h-0 flex-1 overflow-auto p-4 text-xs leading-5">
-        <code>{active?.code ?? ""}</code>
-      </pre>
+      <textarea
+        aria-label={active ? active.path.replace(/^\//, "") : "Source"}
+        value={active?.code ?? ""}
+        onChange={(event) => {
+          if (active) {
+            onChange(active.path, event.target.value);
+          }
+        }}
+        spellCheck={false}
+        className="min-h-0 w-full flex-1 resize-none bg-transparent p-4 font-mono text-xs leading-5 outline-none"
+      />
     </div>
   );
 }

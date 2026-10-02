@@ -19,6 +19,7 @@ import {
   getGeneration,
   getLatestGeneration,
   listGenerations,
+  saveGeneration,
   waitForGeneration,
 } from "@/services/generation";
 import { SourceView } from "@/features/preview/source-view";
@@ -46,7 +47,9 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const generationId = useEditorStore((state) => state.generationId);
   const generationError = useEditorStore((state) => state.generationError);
   const activeFilePath = useEditorStore((state) => state.activeFilePath);
+  const savedFiles = useEditorStore((state) => state.savedFiles);
   const setActiveFile = useEditorStore((state) => state.setActiveFile);
+  const updateFile = useEditorStore((state) => state.updateFile);
   const setActivePage = useEditorStore((state) => state.setActivePage);
   const setPrompt = useEditorStore((state) => state.setPrompt);
   const loadGeneration = useEditorStore((state) => state.loadGeneration);
@@ -55,6 +58,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [openingVersionId, setOpeningVersionId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
@@ -174,9 +179,28 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     }
   }
 
+  async function saveEdit() {
+    if (!generationId || !unsaved || saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await saveGeneration(projectId, generationId, files);
+      loadedProject.current = projectId;
+      loadGeneration(result);
+      queryClient.setQueryData(["generation-latest", projectId], result);
+      await queryClient.invalidateQueries({ queryKey: ["generations", projectId] });
+      toast.success("Edit saved as a new version");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not save this edit"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function download() {
-    if (!generationId || files.length === 0 || downloading) {
-      toast("Generate a UI first");
+    if (!generationId || files.length === 0 || downloading || unsaved) {
+      toast(unsaved ? "Save the edit before downloading" : "Generate a UI first");
       return;
     }
     setDownloading(true);
@@ -262,8 +286,16 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <Button
             variant="outline"
             type="button"
+            onClick={() => void saveEdit()}
+            disabled={!unsaved || saving || showGenerating || !generationId}
+          >
+            {saving ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
             onClick={() => void download()}
-            disabled={downloading || showGenerating || files.length === 0}
+            disabled={downloading || showGenerating || files.length === 0 || unsaved}
           >
             {downloading ? "Downloading…" : "Download"}
           </Button>
@@ -380,7 +412,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             ) : null}
             {!showGenerating && !openingVersionId && files.length > 0 && canvas === "preview" ? (
               <LivePreview
-                key={`${generationId ?? "draft"}:${activePage?.route ?? "/"}`}
+                key={`${generationId ?? "draft"}:${activePage?.route ?? "/"}:${files.reduce((total, file) => total + file.code.length, 0)}`}
                 files={files}
                 route={activePage?.route ?? "/"}
               />
@@ -390,6 +422,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
                 files={files}
                 activePath={activeFilePath}
                 onSelect={setActiveFile}
+                onChange={updateFile}
               />
             ) : null}
             {!showGenerating && !openingVersionId && files.length === 0 ? (
