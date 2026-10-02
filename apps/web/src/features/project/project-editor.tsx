@@ -22,6 +22,7 @@ import {
   saveGeneration,
   waitForGeneration,
 } from "@/services/generation";
+import { PublishDialog } from "@/features/project/publish-dialog";
 import { SourceView } from "@/features/preview/source-view";
 import { getProject, updateProject } from "@/services/projects";
 import { useEditorStore } from "@/store/editor";
@@ -283,6 +284,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <Button variant="outline" type="button" onClick={showPreview}>
             Preview
           </Button>
+          <PublishDialog
+            projectId={projectId}
+            generationId={generationId}
+            disabled={!generationId || files.length === 0 || unsaved || showGenerating}
+          />
           <Button
             variant="outline"
             type="button"

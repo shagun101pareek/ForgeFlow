@@ -1,6 +1,7 @@
 package generation
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -235,6 +236,74 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/zip")
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	return c.Send(body)
+}
+
+type publishRequest struct {
+	Token string `json:"token"`
+}
+
+func (h *Handler) Publish(c *fiber.Ctx) error {
+	queries, userID, projectID, ok := h.ownedProject(c)
+	if !ok {
+		return nil
+	}
+	generationID, err := uuid.Parse(c.Params("generationId"))
+	if err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid generation id")
+	}
+	var body publishRequest
+	if err := c.BodyParser(&body); err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	token := strings.TrimSpace(body.Token)
+	if !validGitHubToken(token) {
+		return respond.Error(c, fiber.StatusBadRequest, "a GitHub personal access token is required")
+	}
+	row, err := queries.GetGenerationForUser(c.Context(), db.GetGenerationForUserParams{
+		ID:        generationID,
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return respond.Error(c, fiber.StatusNotFound, "generation not found")
+		}
+		return respond.Error(c, fiber.StatusInternalServerError, "could not load generation")
+	}
+	if row.Status != "completed" {
+		return respond.Error(c, fiber.StatusConflict, "generation is not ready to publish")
+	}
+	record := generationFromRow(row)
+	slug, files, err := projectBundle(record.Specification.Project.Name, record.Files)
+	if err != nil {
+		return respond.Error(c, fiber.StatusConflict, "generation is not ready to publish")
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 45*time.Second)
+	defer cancel()
+	client := NewGitHubClient()
+	name := "forgeflow-" + slug
+	description := "Generated with ForgeFlow"
+	url, err := client.Publish(ctx, token, name, description, files)
+	if errors.Is(err, ErrNameTaken) {
+		suffix := strings.ReplaceAll(generationID.String(), "-", "")
+		if len(suffix) > 8 {
+			suffix = suffix[:8]
+		}
+		url, err = client.Publish(ctx, token, name+"-"+suffix, description, files)
+	}
+	if err != nil {
+		status, message := githubFailure(err)
+		return respond.Error(c, status, message)
+	}
+	return c.JSON(fiber.Map{"url": url})
+}
+
+func validGitHubToken(token string) bool {
+	if len(token) < 20 || len(token) > 300 || strings.ContainsAny(token, " \t\r\n") {
+		return false
+	}
+	return true
 }
 
 func (h *Handler) ownedProject(c *fiber.Ctx) (*db.Queries, uuid.UUID, uuid.UUID, bool) {
