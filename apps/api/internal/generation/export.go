@@ -9,33 +9,38 @@ import (
 	"unicode"
 )
 
-func BuildZip(projectName string, files []File) ([]byte, string, error) {
+func projectBundle(projectName string, files []File) (string, map[string]string, error) {
 	byPath := map[string]string{}
 	for _, file := range files {
 		byPath[file.Path] = file.Code
 	}
 	app, ok := byPath["/App.js"]
 	if !ok || strings.TrimSpace(app) == "" {
-		return nil, "", fmt.Errorf("generation has no app file")
+		return "", nil, fmt.Errorf("generation has no app file")
 	}
-	css := byPath["/styles.css"]
-
 	slug := projectSlug(projectName)
 	title := strings.TrimSpace(projectName)
 	if title == "" {
 		title = "ForgeFlow"
 	}
-
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	entries := map[string]string{
+	return slug, map[string]string{
 		"package.json":   packageJSON(slug),
 		"vite.config.js": viteConfig,
 		"index.html":     indexHTML(title),
 		"src/main.jsx":   mainJSX,
 		"src/App.jsx":    app,
-		"src/styles.css": css,
+		"src/styles.css": byPath["/styles.css"],
+	}, nil
+}
+
+func BuildZip(projectName string, files []File) ([]byte, string, error) {
+	slug, entries, err := projectBundle(projectName, files)
+	if err != nil {
+		return nil, "", err
 	}
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	for name, contents := range entries {
 		writer, err := zw.Create(name)
 		if err != nil {

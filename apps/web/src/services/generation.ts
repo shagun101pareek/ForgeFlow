@@ -68,6 +68,18 @@ export async function waitForGeneration(projectId: string, generationId: string)
   }
 }
 
+export async function publishGeneration(
+  projectId: string,
+  generationId: string,
+  token: string,
+) {
+  const { data } = await api.post<{ url: string }>(
+    `/api/v1/projects/${projectId}/generations/${generationId}/github`,
+    { token },
+  );
+  return data;
+}
+
 export async function saveGeneration(
   projectId: string,
   generationId: string,

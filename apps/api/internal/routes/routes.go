@@ -85,6 +85,7 @@ func Register(app *fiber.App, deps Dependencies) {
 	protected.Post("/", projectHandler.Create)
 	protected.Post("/:id/generations", generationHandler.Save)
 	protected.Get("/:id/generations/latest", generationHandler.Latest)
+	protected.Post("/:id/generations/:generationId/github", generationHandler.Publish)
 	protected.Get("/:id/generations/:generationId/export", generationHandler.Export)
 	protected.Get("/:id/generations/:generationId", generationHandler.Get)
 	protected.Get("/:id/generations", generationHandler.List)
