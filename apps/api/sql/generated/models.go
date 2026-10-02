@@ -29,6 +29,8 @@ type Project struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Image       []byte
+	ImageType   string
 }
 
 type User struct {

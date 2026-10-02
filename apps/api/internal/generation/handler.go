@@ -72,7 +72,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not save generation")
 	}
 
-	go h.runGeneration(row.ID, project.Name, prompt)
+	go h.runGeneration(row.ID, project.ID, userID, project.Name, prompt)
 
 	return c.Status(fiber.StatusAccepted).JSON(generationFromRow(row))
 }

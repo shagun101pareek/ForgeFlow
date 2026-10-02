@@ -22,6 +22,7 @@ import {
   saveGeneration,
   waitForGeneration,
 } from "@/services/generation";
+import { ProjectImage } from "@/features/project/project-image";
 import { PublishDialog } from "@/features/project/publish-dialog";
 import { SourceView } from "@/features/preview/source-view";
 import { getProject, updateProject } from "@/services/projects";
@@ -454,6 +455,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           </label>
         </section>
         <aside className="border-t p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
+          <ProjectImage projectId={projectId} hasImage={Boolean(project.data.hasImage)} />
           <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Inspector
           </p>

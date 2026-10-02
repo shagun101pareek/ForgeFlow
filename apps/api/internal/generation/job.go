@@ -11,7 +11,7 @@ import (
 	"github.com/shagun101pareek/forgeflow/sql/generated"
 )
 
-func (h *Handler) runGeneration(id uuid.UUID, projectName, prompt string) {
+func (h *Handler) runGeneration(id, projectID, userID uuid.UUID, projectName, prompt string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -34,7 +34,11 @@ func (h *Handler) runGeneration(id uuid.UUID, projectName, prompt string) {
 		return
 	}
 
+	if imageURL := h.projectImageURL(ctx, projectID, userID); imageURL != "" {
+		spec = applyProjectImage(spec, imageURL)
+	}
 	files := GenerateFiles(spec)
+	spec = stripImages(spec)
 	specJSON, err := json.Marshal(spec)
 	if err != nil {
 		h.failGeneration(ctx, id, "could not save generation")
@@ -51,6 +55,17 @@ func (h *Handler) runGeneration(id uuid.UUID, projectName, prompt string) {
 		Specification: specJSON,
 		Files:         filesJSON,
 	})
+}
+
+func (h *Handler) projectImageURL(ctx context.Context, projectID, userID uuid.UUID) string {
+	row, err := h.queries.GetProjectImageForUser(ctx, db.GetProjectImageForUserParams{
+		ID:     projectID,
+		UserID: userID,
+	})
+	if err != nil || len(row.Image) == 0 {
+		return ""
+	}
+	return imageDataURL(row.ImageType, row.Image)
 }
 
 func (h *Handler) failGeneration(ctx context.Context, id uuid.UUID, message string) {

@@ -27,6 +27,7 @@ type projectResponse struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	HasImage    bool   `json:"hasImage"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
 }
@@ -88,13 +89,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not create project")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(projectResponse{
-		ID:          project.ID.String(),
-		Name:        project.Name,
-		Description: project.Description,
-		CreatedAt:   project.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   project.UpdatedAt.UTC().Format(time.RFC3339),
-	})
+	return c.Status(fiber.StatusCreated).JSON(projectJSON(project.ID, project.Name, project.Description, project.HasImage, project.CreatedAt, project.UpdatedAt))
 }
 
 func (h *Handler) Get(c *fiber.Ctx) error {
@@ -119,13 +114,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not load project")
 	}
 
-	return c.JSON(projectResponse{
-		ID:          project.ID.String(),
-		Name:        project.Name,
-		Description: project.Description,
-		CreatedAt:   project.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   project.UpdatedAt.UTC().Format(time.RFC3339),
-	})
+	return c.JSON(projectJSON(project.ID, project.Name, project.Description, project.HasImage, project.CreatedAt, project.UpdatedAt))
 }
 
 func (h *Handler) Update(c *fiber.Ctx) error {
@@ -174,13 +163,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not update project")
 	}
 
-	return c.JSON(projectResponse{
-		ID:          project.ID.String(),
-		Name:        project.Name,
-		Description: project.Description,
-		CreatedAt:   project.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   project.UpdatedAt.UTC().Format(time.RFC3339),
-	})
+	return c.JSON(projectJSON(project.ID, project.Name, project.Description, project.HasImage, project.CreatedAt, project.UpdatedAt))
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -222,12 +205,17 @@ func (h *Handler) authorized(c *fiber.Ctx) (*db.Queries, uuid.UUID, bool) {
 }
 
 func projectFromList(row db.ListProjectsByUserRow) projectResponse {
+	return projectJSON(row.ID, row.Name, row.Description, row.HasImage, row.CreatedAt, row.UpdatedAt)
+}
+
+func projectJSON(id uuid.UUID, name, description string, hasImage bool, createdAt, updatedAt time.Time) projectResponse {
 	return projectResponse{
-		ID:          row.ID.String(),
-		Name:        row.Name,
-		Description: row.Description,
-		CreatedAt:   row.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   row.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:          id.String(),
+		Name:        name,
+		Description: description,
+		HasImage:    hasImage,
+		CreatedAt:   createdAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   updatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
