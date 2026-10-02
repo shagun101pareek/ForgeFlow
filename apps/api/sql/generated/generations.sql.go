@@ -195,6 +195,40 @@ func (q *Queries) ListGenerationsForUserProject(ctx context.Context, arg ListGen
 	return items, nil
 }
 
+const saveGeneration = `-- name: SaveGeneration :one
+INSERT INTO generations (project_id, prompt, specification, files, status)
+VALUES ($1, $2, $3, $4, 'completed')
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message
+`
+
+type SaveGenerationParams struct {
+	ProjectID     uuid.UUID
+	Prompt        string
+	Specification json.RawMessage
+	Files         json.RawMessage
+}
+
+func (q *Queries) SaveGeneration(ctx context.Context, arg SaveGenerationParams) (Generation, error) {
+	row := q.db.QueryRow(ctx, saveGeneration,
+		arg.ProjectID,
+		arg.Prompt,
+		arg.Specification,
+		arg.Files,
+	)
+	var i Generation
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Prompt,
+		&i.Specification,
+		&i.Files,
+		&i.CreatedAt,
+		&i.Status,
+		&i.ErrorMessage,
+	)
+	return i, err
+}
+
 const setGenerationStatus = `-- name: SetGenerationStatus :exec
 UPDATE generations
 SET status = $2

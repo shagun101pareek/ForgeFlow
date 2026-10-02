@@ -148,6 +148,59 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 	return c.JSON(generationFromRow(row))
 }
 
+type saveRequest struct {
+	GenerationID string `json:"generationId"`
+	Files        []File `json:"files"`
+}
+
+func (h *Handler) Save(c *fiber.Ctx) error {
+	queries, userID, projectID, ok := h.ownedProject(c)
+	if !ok {
+		return nil
+	}
+	var body saveRequest
+	if err := c.BodyParser(&body); err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	generationID, err := uuid.Parse(body.GenerationID)
+	if err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid generation id")
+	}
+	row, err := queries.GetGenerationForUser(c.Context(), db.GetGenerationForUserParams{
+		ID:        generationID,
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return respond.Error(c, fiber.StatusNotFound, "generation not found")
+		}
+		return respond.Error(c, fiber.StatusInternalServerError, "could not load generation")
+	}
+	if row.Status != "completed" {
+		return respond.Error(c, fiber.StatusConflict, "generation is not ready to edit")
+	}
+	current := generationFromRow(row)
+	files, err := applyEdits(current.Files, body.Files)
+	if err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	filesJSON, err := json.Marshal(files)
+	if err != nil {
+		return respond.Error(c, fiber.StatusInternalServerError, "could not save edit")
+	}
+	saved, err := queries.SaveGeneration(c.Context(), db.SaveGenerationParams{
+		ProjectID:     projectID,
+		Prompt:        editPrompt(row.Prompt),
+		Specification: row.Specification,
+		Files:         filesJSON,
+	})
+	if err != nil {
+		return respond.Error(c, fiber.StatusInternalServerError, "could not save edit")
+	}
+	return c.Status(fiber.StatusCreated).JSON(generationFromRow(saved))
+}
+
 func (h *Handler) Export(c *fiber.Ctx) error {
 	queries, userID, projectID, ok := h.ownedProject(c)
 	if !ok {

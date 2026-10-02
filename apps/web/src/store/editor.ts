@@ -29,6 +29,7 @@ type EditorState = {
   specification: UISpecification | null;
   generationId: string | null;
   generationError: string | null;
+  savedFiles: string;
   setFiles: (files: EditorFile[]) => void;
   setActiveFile: (path: string | null) => void;
   updateFile: (path: string, code: string) => void;
@@ -47,6 +48,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   specification: null,
   generationId: null,
   generationError: null,
+  savedFiles: "[]",
   setFiles: (files) =>
     set({
       files,
@@ -70,6 +72,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         files: [],
         activeFilePath: null,
         generationError: generation.error || "Generation failed",
+        savedFiles: "[]",
       });
       return;
     }
@@ -90,6 +93,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       pages: pages.length > 0 ? pages : defaultEditorPages,
       activePageId: pages[0]?.id ?? defaultEditorPages[0].id,
       generationError: null,
+      savedFiles: JSON.stringify(generation.files),
     });
   },
   resetWorkspace: () =>
@@ -102,5 +106,6 @@ export const useEditorStore = create<EditorState>((set) => ({
       specification: null,
       generationId: null,
       generationError: null,
+      savedFiles: "[]",
     }),
 }));
