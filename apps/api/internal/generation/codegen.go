@@ -105,6 +105,7 @@ func renderSection(section Section, routes map[string]struct{}) string {
 	switch section.Type {
 	case "hero":
 		return fmt.Sprintf(`        <section className="hero">
+          %s
           <p className="eyebrow">Prototype</p>
           <h1>%s</h1>
           %s
@@ -113,7 +114,7 @@ func renderSection(section Section, routes map[string]struct{}) string {
             %s
           </div>
         </section>
-`, jsText(section.Title), paragraph(section.Subtitle), actionButton("btn", section.PrimaryLabel, section.PrimaryRoute, routes), actionButton("btn secondary", section.SecondaryLabel, section.SecondaryRoute, routes))
+`, heroImage(section.Image), jsText(section.Title), paragraph(section.Subtitle), actionButton("btn", section.PrimaryLabel, section.PrimaryRoute, routes), actionButton("btn secondary", section.SecondaryLabel, section.SecondaryRoute, routes))
 	case "features":
 		return fmt.Sprintf(`        <section className="section">
           <h2>%s</h2>
@@ -283,6 +284,13 @@ func actionButton(className, label, route string, routes map[string]struct{}) st
 	return fmt.Sprintf(`<button type="button" className=%s onClick={() => { setNotice(""); setRoute(%s); }}>%s</button>`, jsString(className), jsString(route), jsText(label))
 }
 
+func heroImage(src string) string {
+	if !strings.HasPrefix(src, "data:image/") {
+		return ""
+	}
+	return fmt.Sprintf(`<img className="hero-image" alt="" src={%s} />`, jsString(src))
+}
+
 func paragraph(value string) string {
 	if strings.TrimSpace(value) == "" {
 		return ""
@@ -373,6 +381,8 @@ button, input { font: inherit; }
 main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; }
 
 .hero { padding: 48px 0 24px; }
+
+.hero-image { display: block; width: 100%; max-height: 280px; object-fit: cover; border-radius: 16px; margin-bottom: 24px; }
 
 .eyebrow {
   margin: 0 0 12px;

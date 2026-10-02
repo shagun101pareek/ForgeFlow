@@ -1,0 +1,3 @@
+ALTER TABLE projects
+    ADD COLUMN image BYTEA,
+    ADD COLUMN image_type TEXT NOT NULL DEFAULT '';

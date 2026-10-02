@@ -55,6 +55,7 @@ type Section struct {
 	PrimaryRoute   string `json:"primaryRoute"`
 	SecondaryLabel string `json:"secondaryLabel"`
 	SecondaryRoute string `json:"secondaryRoute"`
+	Image          string `json:"image,omitempty"`
 	Items          []Item `json:"items"`
 }
 

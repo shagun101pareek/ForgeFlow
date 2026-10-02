@@ -30,3 +30,24 @@ export async function updateProject(id: string, input: UpdateProjectInput) {
 export async function deleteProject(id: string) {
   await api.delete(`/api/v1/projects/${id}`);
 }
+
+export async function uploadProjectImage(id: string, file: File) {
+  const body = new FormData();
+  body.append("image", file);
+  const { data } = await api.post<Project>(`/api/v1/projects/${id}/image`, body, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function deleteProjectImage(id: string) {
+  const { data } = await api.delete<Project>(`/api/v1/projects/${id}/image`);
+  return data;
+}
+
+export async function getProjectImage(id: string) {
+  const { data } = await api.get<Blob>(`/api/v1/projects/${id}/image`, {
+    responseType: "blob",
+  });
+  return data;
+}

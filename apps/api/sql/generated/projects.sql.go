@@ -13,10 +13,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearProjectImage = `-- name: ClearProjectImage :execrows
+UPDATE projects
+SET image = NULL, image_type = '', updated_at = now()
+WHERE id = $1 AND user_id = $2
+`
+
+type ClearProjectImageParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) ClearProjectImage(ctx context.Context, arg ClearProjectImageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearProjectImage, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (user_id, name, description)
 VALUES ($1, $2, $3)
-RETURNING id, name, description, created_at, updated_at
+RETURNING id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
 `
 
 type CreateProjectParams struct {
@@ -31,6 +50,7 @@ type CreateProjectRow struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	HasImage    bool
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error) {
@@ -42,6 +62,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (C
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HasImage,
 	)
 	return i, err
 }
@@ -65,7 +86,7 @@ func (q *Queries) DeleteProject(ctx context.Context, arg DeleteProjectParams) (i
 }
 
 const getProjectByIDForUser = `-- name: GetProjectByIDForUser :one
-SELECT id, name, description, created_at, updated_at
+SELECT id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
 FROM projects
 WHERE id = $1 AND user_id = $2
 `
@@ -81,6 +102,7 @@ type GetProjectByIDForUserRow struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	HasImage    bool
 }
 
 func (q *Queries) GetProjectByIDForUser(ctx context.Context, arg GetProjectByIDForUserParams) (GetProjectByIDForUserRow, error) {
@@ -92,12 +114,36 @@ func (q *Queries) GetProjectByIDForUser(ctx context.Context, arg GetProjectByIDF
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HasImage,
 	)
 	return i, err
 }
 
+const getProjectImageForUser = `-- name: GetProjectImageForUser :one
+SELECT image, image_type
+FROM projects
+WHERE id = $1 AND user_id = $2
+`
+
+type GetProjectImageForUserParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+type GetProjectImageForUserRow struct {
+	Image     []byte
+	ImageType string
+}
+
+func (q *Queries) GetProjectImageForUser(ctx context.Context, arg GetProjectImageForUserParams) (GetProjectImageForUserRow, error) {
+	row := q.db.QueryRow(ctx, getProjectImageForUser, arg.ID, arg.UserID)
+	var i GetProjectImageForUserRow
+	err := row.Scan(&i.Image, &i.ImageType)
+	return i, err
+}
+
 const listProjectsByUser = `-- name: ListProjectsByUser :many
-SELECT id, name, description, created_at, updated_at
+SELECT id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
 FROM projects
 WHERE user_id = $1
 ORDER BY updated_at DESC
@@ -109,6 +155,7 @@ type ListProjectsByUserRow struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	HasImage    bool
 }
 
 func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]ListProjectsByUserRow, error) {
@@ -126,6 +173,7 @@ func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]L
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.HasImage,
 		); err != nil {
 			return nil, err
 		}
@@ -137,6 +185,29 @@ func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]L
 	return items, nil
 }
 
+const setProjectImage = `-- name: SetProjectImage :exec
+UPDATE projects
+SET image = $3, image_type = $4, updated_at = now()
+WHERE id = $1 AND user_id = $2
+`
+
+type SetProjectImageParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Image     []byte
+	ImageType string
+}
+
+func (q *Queries) SetProjectImage(ctx context.Context, arg SetProjectImageParams) error {
+	_, err := q.db.Exec(ctx, setProjectImage,
+		arg.ID,
+		arg.UserID,
+		arg.Image,
+		arg.ImageType,
+	)
+	return err
+}
+
 const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET
@@ -144,7 +215,7 @@ SET
     description = COALESCE($2, description),
     updated_at = now()
 WHERE id = $3 AND user_id = $4
-RETURNING id, name, description, created_at, updated_at
+RETURNING id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
 `
 
 type UpdateProjectParams struct {
@@ -160,6 +231,7 @@ type UpdateProjectRow struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	HasImage    bool
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (UpdateProjectRow, error) {
@@ -176,6 +248,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (U
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HasImage,
 	)
 	return i, err
 }
