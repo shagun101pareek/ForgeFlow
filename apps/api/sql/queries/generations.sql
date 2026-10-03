@@ -1,12 +1,12 @@
 -- name: SaveGeneration :one
 INSERT INTO generations (project_id, prompt, specification, files, status)
 VALUES ($1, $2, $3, $4, 'completed')
-RETURNING id, project_id, prompt, specification, files, created_at, status, error_message;
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message, github_url;
 
 -- name: CreateGeneration :one
 INSERT INTO generations (project_id, prompt, specification, files, status)
 VALUES ($1, $2, '{}'::jsonb, '[]'::jsonb, 'queued')
-RETURNING id, project_id, prompt, specification, files, created_at, status, error_message;
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message, github_url;
 
 -- name: SetGenerationStatus :exec
 UPDATE generations
@@ -35,8 +35,13 @@ WHERE project_id = $1
   AND status IN ('queued', 'running')
   AND created_at < now() - interval '2 minutes';
 
+-- name: SetGenerationGitHubURL :exec
+UPDATE generations
+SET github_url = $2
+WHERE id = $1;
+
 -- name: GetLatestGenerationForUserProject :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
@@ -51,7 +56,7 @@ WHERE g.project_id = $1 AND p.user_id = $2
 ORDER BY g.created_at DESC;
 
 -- name: GetGenerationForUser :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.id = $1 AND g.project_id = $2 AND p.user_id = $3;

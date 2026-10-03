@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -174,6 +175,18 @@ func (c GitHubClient) request(ctx context.Context, token, method, path string, b
 		message = apiErr.Message
 	}
 	return res.StatusCode, message, nil
+}
+
+func validRepositoryURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" {
+		return false
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
 }
 
 func githubFailure(err error) (int, string) {

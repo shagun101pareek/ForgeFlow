@@ -296,6 +296,15 @@ func (h *Handler) Publish(c *fiber.Ctx) error {
 		status, message := githubFailure(err)
 		return respond.Error(c, status, message)
 	}
+	if !validRepositoryURL(url) {
+		return respond.Error(c, fiber.StatusBadGateway, "GitHub did not return a repository url")
+	}
+	if err := queries.SetGenerationGitHubURL(c.Context(), db.SetGenerationGitHubURLParams{
+		ID:        generationID,
+		GithubUrl: url,
+	}); err != nil {
+		return respond.Error(c, fiber.StatusInternalServerError, "could not save the repository link")
+	}
 	return c.JSON(fiber.Map{"url": url})
 }
 
@@ -350,6 +359,7 @@ type generationResponse struct {
 	Error         string `json:"error"`
 	Specification Spec   `json:"specification"`
 	Files         []File `json:"files"`
+	GitHubURL     string `json:"githubUrl"`
 	CreatedAt     string `json:"createdAt"`
 }
 
@@ -372,6 +382,7 @@ func generationFromRow(row db.Generation) generationResponse {
 		Error:         row.ErrorMessage,
 		Specification: spec,
 		Files:         files,
+		GitHubURL:     row.GithubUrl,
 		CreatedAt:     row.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

@@ -29,6 +29,7 @@ type EditorState = {
   specification: UISpecification | null;
   generationId: string | null;
   generationError: string | null;
+  githubUrl: string;
   savedFiles: string;
   setFiles: (files: EditorFile[]) => void;
   setActiveFile: (path: string | null) => void;
@@ -36,6 +37,7 @@ type EditorState = {
   setActivePage: (id: string) => void;
   setPrompt: (prompt: string) => void;
   loadGeneration: (generation: GenerationResult) => void;
+  setGithubUrl: (url: string) => void;
   resetWorkspace: () => void;
 };
 
@@ -48,6 +50,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   specification: null,
   generationId: null,
   generationError: null,
+  githubUrl: "",
   savedFiles: "[]",
   setFiles: (files) =>
     set({
@@ -72,6 +75,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         files: [],
         activeFilePath: null,
         generationError: generation.error || "Generation failed",
+        githubUrl: "",
         savedFiles: "[]",
       });
       return;
@@ -93,9 +97,11 @@ export const useEditorStore = create<EditorState>((set) => ({
       pages: pages.length > 0 ? pages : defaultEditorPages,
       activePageId: pages[0]?.id ?? defaultEditorPages[0].id,
       generationError: null,
+      githubUrl: generation.githubUrl ?? "",
       savedFiles: JSON.stringify(generation.files),
     });
   },
+  setGithubUrl: (url) => set({ githubUrl: url }),
   resetWorkspace: () =>
     set({
       files: [],
@@ -106,6 +112,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       specification: null,
       generationId: null,
       generationError: null,
+      githubUrl: "",
       savedFiles: "[]",
     }),
 }));

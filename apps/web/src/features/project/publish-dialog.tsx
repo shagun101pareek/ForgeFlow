@@ -18,25 +18,54 @@ import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/api-error";
 import { publishGeneration } from "@/services/generation";
 
+function repositoryURL(value: string) {
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.hostname !== "github.com" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
+    }
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length !== 2) {
+      return null;
+    }
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export function PublishDialog({
   projectId,
   generationId,
+  githubUrl,
   disabled,
+  onPublished,
 }: {
   projectId: string;
   generationId: string | null;
+  githubUrl: string;
   disabled: boolean;
+  onPublished: (url: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
   const [publishing, setPublishing] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const savedUrl = repositoryURL(githubUrl);
+  const url = publishedUrl ?? savedUrl;
 
   function close(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
       setToken("");
-      setUrl(null);
+      setPublishedUrl(null);
     }
   }
 
@@ -52,8 +81,14 @@ export function PublishDialog({
     setPublishing(true);
     try {
       const result = await publishGeneration(projectId, generationId, nextToken);
+      const nextUrl = repositoryURL(result.url);
+      if (!nextUrl) {
+        toast.error("GitHub did not return a repository url");
+        return;
+      }
       setToken("");
-      setUrl(result.url);
+      setPublishedUrl(nextUrl);
+      onPublished(nextUrl);
       toast.success("Repository created");
     } catch (error) {
       toast.error(getErrorMessage(error, "Could not publish to GitHub"));
@@ -63,6 +98,17 @@ export function PublishDialog({
   }
 
   return (
+    <div className="flex items-center gap-2">
+      {savedUrl ? (
+        <a
+          href={savedUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="max-w-40 truncate text-sm underline"
+        >
+          {savedUrl.replace("https://github.com/", "")}
+        </a>
+      ) : null}
     <Dialog open={open} onOpenChange={close}>
       <DialogTrigger
         render={
@@ -88,7 +134,8 @@ export function PublishDialog({
           >
             {url}
           </a>
-        ) : (
+        ) : null}
+        {publishedUrl ? null : (
           <form
             className="flex flex-col gap-4"
             onSubmit={(event) => {
@@ -127,5 +174,6 @@ export function PublishDialog({
         )}
       </DialogContent>
     </Dialog>
+    </div>
   );
 }

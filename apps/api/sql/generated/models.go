@@ -20,6 +20,7 @@ type Generation struct {
 	CreatedAt     time.Time
 	Status        string
 	ErrorMessage  string
+	GithubUrl     string
 }
 
 type Project struct {
