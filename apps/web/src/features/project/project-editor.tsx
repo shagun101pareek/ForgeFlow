@@ -7,12 +7,24 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/api-error";
 import type { GenerationPromptInput } from "@/lib/validators";
 import {
+  deleteGeneration,
   downloadGeneration,
   enqueueGeneration,
   generationIsActive,
@@ -21,6 +33,7 @@ import {
   listGenerations,
   saveGeneration,
   waitForGeneration,
+  type GenerationSummary,
 } from "@/services/generation";
 import { ProjectImage } from "@/features/project/project-image";
 import { PublishDialog } from "@/features/project/publish-dialog";
@@ -162,6 +175,21 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       return;
     }
     generation.mutate({ projectId, prompt: nextPrompt });
+  }
+
+  async function discardVersion(id: string) {
+    await deleteGeneration(projectId, id);
+    await queryClient.invalidateQueries({ queryKey: ["generations", projectId] });
+    if (id === generationId) {
+      const next = await getLatestGeneration(projectId);
+      queryClient.setQueryData(["generation-latest", projectId], next);
+      loadedProject.current = projectId;
+      if (next && !generationIsActive(next.status)) {
+        loadGeneration(next);
+      } else {
+        resetWorkspace();
+      }
+    }
   }
 
   async function openVersion(id: string) {
@@ -361,31 +389,16 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           ) : null}
           {versions.data && versions.data.length > 0 ? (
             <ul className="flex gap-2 overflow-x-auto lg:flex-col">
-              {versions.data.map((version) => {
-                const selected = version.id === generationId;
-                const label =
-                  version.prompt.length > 72
-                    ? `${version.prompt.slice(0, 72)}…`
-                    : version.prompt;
-                return (
-                  <li key={version.id}>
-                    <button
-                      type="button"
-                      onClick={() => void openVersion(version.id)}
-                      disabled={openingVersionId === version.id}
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                        selected ? "bg-muted font-medium" : "hover:bg-muted/60"
-                      }`}
-                    >
-                      {label}
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {versionStatusLabel(version.status)}
-                        {new Date(version.createdAt).toLocaleString()}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
+              {versions.data.map((version) => (
+                <VersionItem
+                  key={version.id}
+                  version={version}
+                  selected={version.id === generationId}
+                  opening={openingVersionId === version.id}
+                  onOpen={() => void openVersion(version.id)}
+                  onDiscard={() => discardVersion(version.id)}
+                />
+              ))}
             </ul>
           ) : null}
         </aside>
@@ -506,4 +519,85 @@ function versionStatusLabel(status: string) {
     return "";
   }
   return `${status.charAt(0).toUpperCase()}${status.slice(1)} · `;
+}
+
+function VersionItem({
+  version,
+  selected,
+  opening,
+  onOpen,
+  onDiscard,
+}: {
+  version: GenerationSummary;
+  selected: boolean;
+  opening: boolean;
+  onOpen: () => void;
+  onDiscard: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const label =
+    version.prompt.length > 72 ? `${version.prompt.slice(0, 72)}…` : version.prompt;
+  const running = generationIsActive(version.status);
+
+  async function remove() {
+    if (removing) {
+      return;
+    }
+    setRemoving(true);
+    try {
+      await onDiscard();
+      toast.success("Version removed");
+      setOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not remove that version"));
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <li className="flex min-w-56 items-start gap-1 lg:min-w-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={opening}
+        className={`min-w-0 flex-1 rounded-lg px-3 py-2 text-left text-sm ${
+          selected ? "bg-muted font-medium" : "hover:bg-muted/60"
+        }`}
+      >
+        {label}
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {versionStatusLabel(version.status)}
+          {new Date(version.createdAt).toLocaleString()}
+        </span>
+      </button>
+      {running ? null : (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+          <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>
+            Discard
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard this version?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the version from the project. Other versions stay,
+                and a published GitHub repository is left in place.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={removing}
+                onClick={() => void remove()}
+              >
+                {removing ? "Removing…" : "Discard"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </li>
+  );
 }

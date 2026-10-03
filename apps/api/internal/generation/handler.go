@@ -149,6 +149,43 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 	return c.JSON(generationFromRow(row))
 }
 
+func (h *Handler) Delete(c *fiber.Ctx) error {
+	queries, userID, projectID, ok := h.ownedProject(c)
+	if !ok {
+		return nil
+	}
+	generationID, err := uuid.Parse(c.Params("generationId"))
+	if err != nil {
+		return respond.Error(c, fiber.StatusBadRequest, "invalid generation id")
+	}
+	row, err := queries.GetGenerationForUser(c.Context(), db.GetGenerationForUserParams{
+		ID:        generationID,
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return respond.Error(c, fiber.StatusNotFound, "generation not found")
+		}
+		return respond.Error(c, fiber.StatusInternalServerError, "could not load generation")
+	}
+	if row.Status == "queued" || row.Status == "running" {
+		return respond.Error(c, fiber.StatusConflict, "generation is still running")
+	}
+	deleted, err := queries.DeleteGenerationForUser(c.Context(), db.DeleteGenerationForUserParams{
+		ID:        generationID,
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		return respond.Error(c, fiber.StatusInternalServerError, "could not remove generation")
+	}
+	if deleted == 0 {
+		return respond.Error(c, fiber.StatusNotFound, "generation not found")
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 type saveRequest struct {
 	GenerationID string `json:"generationId"`
 	Files        []File `json:"files"`

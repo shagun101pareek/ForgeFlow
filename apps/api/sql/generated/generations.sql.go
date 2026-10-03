@@ -61,6 +61,30 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 	return i, err
 }
 
+const deleteGenerationForUser = `-- name: DeleteGenerationForUser :execrows
+DELETE FROM generations
+WHERE generations.id = $1
+  AND generations.project_id = $2
+  AND EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = generations.project_id AND projects.user_id = $3
+  )
+`
+
+type DeleteGenerationForUserParams struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+}
+
+func (q *Queries) DeleteGenerationForUser(ctx context.Context, arg DeleteGenerationForUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteGenerationForUser, arg.ID, arg.ProjectID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const failGeneration = `-- name: FailGeneration :exec
 UPDATE generations
 SET status = 'failed',

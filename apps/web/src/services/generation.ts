@@ -131,6 +131,10 @@ export async function downloadGeneration(projectId: string, generationId: string
   URL.revokeObjectURL(url);
 }
 
+export async function deleteGeneration(projectId: string, generationId: string) {
+  await api.delete(`/api/v1/projects/${projectId}/generations/${generationId}`);
+}
+
 export async function getGeneration(projectId: string, generationId: string) {
   const { data } = await api.get<GenerationResult>(
     `/api/v1/projects/${projectId}/generations/${generationId}`,
