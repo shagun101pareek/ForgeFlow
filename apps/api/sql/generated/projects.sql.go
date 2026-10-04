@@ -143,19 +143,34 @@ func (q *Queries) GetProjectImageForUser(ctx context.Context, arg GetProjectImag
 }
 
 const listProjectsByUser = `-- name: ListProjectsByUser :many
-SELECT id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
-FROM projects
-WHERE user_id = $1
-ORDER BY updated_at DESC
+SELECT
+    p.id,
+    p.name,
+    p.description,
+    p.created_at,
+    p.updated_at,
+    (p.image IS NOT NULL)::boolean AS has_image,
+    COALESCE(latest.prompt, '') AS latest_prompt
+FROM projects p
+LEFT JOIN LATERAL (
+    SELECT g.prompt
+    FROM generations g
+    WHERE g.project_id = p.id
+    ORDER BY g.created_at DESC
+    LIMIT 1
+) latest ON true
+WHERE p.user_id = $1
+ORDER BY p.updated_at DESC
 `
 
 type ListProjectsByUserRow struct {
-	ID          uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	HasImage    bool
+	ID           uuid.UUID
+	Name         string
+	Description  string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	HasImage     bool
+	LatestPrompt string
 }
 
 func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]ListProjectsByUserRow, error) {
@@ -174,6 +189,7 @@ func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]L
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.HasImage,
+			&i.LatestPrompt,
 		); err != nil {
 			return nil, err
 		}
