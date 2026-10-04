@@ -24,12 +24,13 @@ func NewHandler(queries *db.Queries) *Handler {
 }
 
 type projectResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	HasImage    bool   `json:"hasImage"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	HasImage     bool   `json:"hasImage"`
+	LatestPrompt string `json:"latestPrompt,omitempty"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
 }
 
 type createProjectRequest struct {
@@ -205,7 +206,9 @@ func (h *Handler) authorized(c *fiber.Ctx) (*db.Queries, uuid.UUID, bool) {
 }
 
 func projectFromList(row db.ListProjectsByUserRow) projectResponse {
-	return projectJSON(row.ID, row.Name, row.Description, row.HasImage, row.CreatedAt, row.UpdatedAt)
+	project := projectJSON(row.ID, row.Name, row.Description, row.HasImage, row.CreatedAt, row.UpdatedAt)
+	project.LatestPrompt = row.LatestPrompt
+	return project
 }
 
 func projectJSON(id uuid.UUID, name, description string, hasImage bool, createdAt, updatedAt time.Time) projectResponse {

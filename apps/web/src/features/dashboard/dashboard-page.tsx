@@ -113,6 +113,13 @@ function ProjectCard({ project }: { project: Project }) {
                 {project.description}
               </CardDescription>
             ) : null}
+            <p
+              className={`mt-3 line-clamp-2 text-sm ${
+                project.latestPrompt ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {project.latestPrompt ?? "Nothing generated yet."}
+            </p>
             {updated ? (
               <p className="mt-3 text-xs text-muted-foreground">
                 Updated {updated}

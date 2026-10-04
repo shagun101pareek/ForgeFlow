@@ -5,6 +5,7 @@ export type Project = {
   name: string;
   description?: string;
   hasImage?: boolean;
+  latestPrompt?: string;
   updatedAt?: string;
 };
 

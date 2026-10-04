@@ -1,8 +1,22 @@
 -- name: ListProjectsByUser :many
-SELECT id, name, description, created_at, updated_at, (image IS NOT NULL)::boolean AS has_image
-FROM projects
-WHERE user_id = $1
-ORDER BY updated_at DESC;
+SELECT
+    p.id,
+    p.name,
+    p.description,
+    p.created_at,
+    p.updated_at,
+    (p.image IS NOT NULL)::boolean AS has_image,
+    COALESCE(latest.prompt, '') AS latest_prompt
+FROM projects p
+LEFT JOIN LATERAL (
+    SELECT g.prompt
+    FROM generations g
+    WHERE g.project_id = p.id
+    ORDER BY g.created_at DESC
+    LIMIT 1
+) latest ON true
+WHERE p.user_id = $1
+ORDER BY p.updated_at DESC;
 
 -- name: CreateProject :one
 INSERT INTO projects (user_id, name, description)
