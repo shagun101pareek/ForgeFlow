@@ -60,6 +60,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const files = useEditorStore((state) => state.files);
   const specification = useEditorStore((state) => state.specification);
   const generationId = useEditorStore((state) => state.generationId);
+  const githubUrl = useEditorStore((state) => state.githubUrl);
   const generationError = useEditorStore((state) => state.generationError);
   const activeFilePath = useEditorStore((state) => state.activeFilePath);
   const savedFiles = useEditorStore((state) => state.savedFiles);
@@ -68,6 +69,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const setActivePage = useEditorStore((state) => state.setActivePage);
   const setPrompt = useEditorStore((state) => state.setPrompt);
   const loadGeneration = useEditorStore((state) => state.loadGeneration);
+  const setGithubUrl = useEditorStore((state) => state.setGithubUrl);
   const resetWorkspace = useEditorStore((state) => state.resetWorkspace);
   const activePage = pages.find((page) => page.id === activePageId) ?? pages[0];
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -316,7 +318,9 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <PublishDialog
             projectId={projectId}
             generationId={generationId}
+            githubUrl={githubUrl}
             disabled={!generationId || files.length === 0 || unsaved || showGenerating}
+            onPublished={setGithubUrl}
           />
           <Button
             variant="outline"

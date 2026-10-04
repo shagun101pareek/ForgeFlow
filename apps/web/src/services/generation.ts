@@ -27,6 +27,7 @@ export type GenerationResult = {
   error: string;
   specification: UISpecification;
   files: GeneratedFile[];
+  githubUrl: string;
   createdAt: string;
 };
 

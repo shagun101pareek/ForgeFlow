@@ -36,7 +36,7 @@ func (q *Queries) CompleteGeneration(ctx context.Context, arg CompleteGeneration
 const createGeneration = `-- name: CreateGeneration :one
 INSERT INTO generations (project_id, prompt, specification, files, status)
 VALUES ($1, $2, '{}'::jsonb, '[]'::jsonb, 'queued')
-RETURNING id, project_id, prompt, specification, files, created_at, status, error_message
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message, github_url
 `
 
 type CreateGenerationParams struct {
@@ -56,6 +56,7 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 		&i.CreatedAt,
 		&i.Status,
 		&i.ErrorMessage,
+		&i.GithubUrl,
 	)
 	return i, err
 }
@@ -116,7 +117,7 @@ func (q *Queries) FailStaleGenerations(ctx context.Context, projectID uuid.UUID)
 }
 
 const getGenerationForUser = `-- name: GetGenerationForUser :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.id = $1 AND g.project_id = $2 AND p.user_id = $3
@@ -140,12 +141,13 @@ func (q *Queries) GetGenerationForUser(ctx context.Context, arg GetGenerationFor
 		&i.CreatedAt,
 		&i.Status,
 		&i.ErrorMessage,
+		&i.GithubUrl,
 	)
 	return i, err
 }
 
 const getLatestGenerationForUserProject = `-- name: GetLatestGenerationForUserProject :one
-SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g
 JOIN projects p ON p.id = g.project_id
 WHERE g.project_id = $1 AND p.user_id = $2
@@ -170,6 +172,7 @@ func (q *Queries) GetLatestGenerationForUserProject(ctx context.Context, arg Get
 		&i.CreatedAt,
 		&i.Status,
 		&i.ErrorMessage,
+		&i.GithubUrl,
 	)
 	return i, err
 }
@@ -222,7 +225,7 @@ func (q *Queries) ListGenerationsForUserProject(ctx context.Context, arg ListGen
 const saveGeneration = `-- name: SaveGeneration :one
 INSERT INTO generations (project_id, prompt, specification, files, status)
 VALUES ($1, $2, $3, $4, 'completed')
-RETURNING id, project_id, prompt, specification, files, created_at, status, error_message
+RETURNING id, project_id, prompt, specification, files, created_at, status, error_message, github_url
 `
 
 type SaveGenerationParams struct {
@@ -249,8 +252,25 @@ func (q *Queries) SaveGeneration(ctx context.Context, arg SaveGenerationParams) 
 		&i.CreatedAt,
 		&i.Status,
 		&i.ErrorMessage,
+		&i.GithubUrl,
 	)
 	return i, err
+}
+
+const setGenerationGitHubURL = `-- name: SetGenerationGitHubURL :exec
+UPDATE generations
+SET github_url = $2
+WHERE id = $1
+`
+
+type SetGenerationGitHubURLParams struct {
+	ID        uuid.UUID
+	GithubUrl string
+}
+
+func (q *Queries) SetGenerationGitHubURL(ctx context.Context, arg SetGenerationGitHubURLParams) error {
+	_, err := q.db.Exec(ctx, setGenerationGitHubURL, arg.ID, arg.GithubUrl)
+	return err
 }
 
 const setGenerationStatus = `-- name: SetGenerationStatus :exec
