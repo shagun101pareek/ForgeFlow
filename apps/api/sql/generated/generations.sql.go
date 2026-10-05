@@ -116,6 +116,22 @@ func (q *Queries) FailStaleGenerations(ctx context.Context, projectID uuid.UUID)
 	return err
 }
 
+const failStaleGenerationsForUser = `-- name: FailStaleGenerationsForUser :exec
+UPDATE generations AS g
+SET status = 'failed',
+    error_message = 'Generation timed out'
+FROM projects AS p
+WHERE g.project_id = p.id
+  AND p.user_id = $1
+  AND g.status IN ('queued', 'running')
+  AND g.created_at < now() - interval '2 minutes'
+`
+
+func (q *Queries) FailStaleGenerationsForUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, failStaleGenerationsForUser, userID)
+	return err
+}
+
 const getGenerationForUser = `-- name: GetGenerationForUser :one
 SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g

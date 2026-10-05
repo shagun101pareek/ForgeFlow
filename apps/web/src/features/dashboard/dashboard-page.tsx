@@ -34,6 +34,12 @@ export function DashboardPage() {
   const projects = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
+    refetchInterval: (query) =>
+      query.state.data?.some((project) =>
+        project.latestStatus === "queued" || project.latestStatus === "running",
+      )
+        ? 1000
+        : false,
   });
 
   return (
@@ -83,6 +89,16 @@ export function DashboardPage() {
   );
 }
 
+function OutcomeLabel({ status }: { status: string | undefined }) {
+  if (status === "queued" || status === "running") {
+    return <span className="font-medium">Running. </span>;
+  }
+  if (status === "failed") {
+    return <span className="font-medium text-destructive">Failed. </span>;
+  }
+  return null;
+}
+
 function ProjectCard({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -118,6 +134,7 @@ function ProjectCard({ project }: { project: Project }) {
                 project.latestPrompt ? "text-foreground" : "text-muted-foreground"
               }`}
             >
+              <OutcomeLabel status={project.latestStatus} />
               {project.latestPrompt ?? "Nothing generated yet."}
             </p>
             {updated ? (
