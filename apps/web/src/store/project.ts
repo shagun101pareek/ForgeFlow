@@ -6,6 +6,7 @@ export type Project = {
   description?: string;
   hasImage?: boolean;
   latestPrompt?: string;
+  latestStatus?: string;
   updatedAt?: string;
 };
 

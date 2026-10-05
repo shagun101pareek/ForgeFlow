@@ -27,6 +27,16 @@ SET status = 'failed',
     error_message = $2
 WHERE id = $1 AND status IN ('queued', 'running');
 
+-- name: FailStaleGenerationsForUser :exec
+UPDATE generations AS g
+SET status = 'failed',
+    error_message = 'Generation timed out'
+FROM projects AS p
+WHERE g.project_id = p.id
+  AND p.user_id = $1
+  AND g.status IN ('queued', 'running')
+  AND g.created_at < now() - interval '2 minutes';
+
 -- name: FailStaleGenerations :exec
 UPDATE generations
 SET status = 'failed',

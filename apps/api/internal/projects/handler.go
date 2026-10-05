@@ -29,6 +29,7 @@ type projectResponse struct {
 	Description  string `json:"description"`
 	HasImage     bool   `json:"hasImage"`
 	LatestPrompt string `json:"latestPrompt,omitempty"`
+	LatestStatus string `json:"latestStatus,omitempty"`
 	CreatedAt    string `json:"createdAt"`
 	UpdatedAt    string `json:"updatedAt"`
 }
@@ -49,6 +50,7 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		return nil
 	}
 
+	_ = queries.FailStaleGenerationsForUser(c.Context(), userID)
 	rows, err := queries.ListProjectsByUser(c.Context(), userID)
 	if err != nil {
 		return respond.Error(c, fiber.StatusInternalServerError, "could not list projects")
@@ -208,6 +210,7 @@ func (h *Handler) authorized(c *fiber.Ctx) (*db.Queries, uuid.UUID, bool) {
 func projectFromList(row db.ListProjectsByUserRow) projectResponse {
 	project := projectJSON(row.ID, row.Name, row.Description, row.HasImage, row.CreatedAt, row.UpdatedAt)
 	project.LatestPrompt = row.LatestPrompt
+	project.LatestStatus = row.LatestStatus
 	return project
 }
 

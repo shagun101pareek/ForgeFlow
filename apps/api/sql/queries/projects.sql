@@ -6,10 +6,11 @@ SELECT
     p.created_at,
     p.updated_at,
     (p.image IS NOT NULL)::boolean AS has_image,
-    COALESCE(latest.prompt, '') AS latest_prompt
+    COALESCE(latest.prompt, '') AS latest_prompt,
+    COALESCE(latest.status, '') AS latest_status
 FROM projects p
 LEFT JOIN LATERAL (
-    SELECT g.prompt
+    SELECT g.prompt, g.status
     FROM generations g
     WHERE g.project_id = p.id
     ORDER BY g.created_at DESC
