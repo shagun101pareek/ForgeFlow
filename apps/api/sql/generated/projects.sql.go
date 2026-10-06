@@ -151,10 +151,11 @@ SELECT
     p.updated_at,
     (p.image IS NOT NULL)::boolean AS has_image,
     COALESCE(latest.prompt, '') AS latest_prompt,
-    COALESCE(latest.status, '') AS latest_status
+    COALESCE(latest.status, '') AS latest_status,
+    COALESCE(latest.github_url, '') AS latest_repository
 FROM projects p
 LEFT JOIN LATERAL (
-    SELECT g.prompt, g.status
+    SELECT g.prompt, g.status, g.github_url
     FROM generations g
     WHERE g.project_id = p.id
     ORDER BY g.created_at DESC
@@ -165,14 +166,15 @@ ORDER BY p.updated_at DESC
 `
 
 type ListProjectsByUserRow struct {
-	ID           uuid.UUID
-	Name         string
-	Description  string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	HasImage     bool
-	LatestPrompt string
-	LatestStatus string
+	ID               uuid.UUID
+	Name             string
+	Description      string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	HasImage         bool
+	LatestPrompt     string
+	LatestStatus     string
+	LatestRepository string
 }
 
 func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]ListProjectsByUserRow, error) {
@@ -193,6 +195,7 @@ func (q *Queries) ListProjectsByUser(ctx context.Context, userID uuid.UUID) ([]L
 			&i.HasImage,
 			&i.LatestPrompt,
 			&i.LatestStatus,
+			&i.LatestRepository,
 		); err != nil {
 			return nil, err
 		}

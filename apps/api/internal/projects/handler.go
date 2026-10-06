@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shagun101pareek/forgeflow/internal/auth"
+	"github.com/shagun101pareek/forgeflow/internal/generation"
 	"github.com/shagun101pareek/forgeflow/internal/respond"
 	"github.com/shagun101pareek/forgeflow/sql/generated"
 )
@@ -24,14 +25,15 @@ func NewHandler(queries *db.Queries) *Handler {
 }
 
 type projectResponse struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	HasImage     bool   `json:"hasImage"`
-	LatestPrompt string `json:"latestPrompt,omitempty"`
-	LatestStatus string `json:"latestStatus,omitempty"`
-	CreatedAt    string `json:"createdAt"`
-	UpdatedAt    string `json:"updatedAt"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	HasImage         bool   `json:"hasImage"`
+	LatestPrompt     string `json:"latestPrompt,omitempty"`
+	LatestStatus     string `json:"latestStatus,omitempty"`
+	LatestRepository string `json:"latestRepository,omitempty"`
+	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
 }
 
 type createProjectRequest struct {
@@ -211,6 +213,9 @@ func projectFromList(row db.ListProjectsByUserRow) projectResponse {
 	project := projectJSON(row.ID, row.Name, row.Description, row.HasImage, row.CreatedAt, row.UpdatedAt)
 	project.LatestPrompt = row.LatestPrompt
 	project.LatestStatus = row.LatestStatus
+	if row.LatestStatus == "completed" && generation.ValidRepositoryURL(row.LatestRepository) {
+		project.LatestRepository = row.LatestRepository
+	}
 	return project
 }
 

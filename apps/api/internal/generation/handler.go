@@ -333,7 +333,7 @@ func (h *Handler) Publish(c *fiber.Ctx) error {
 		status, message := githubFailure(err)
 		return respond.Error(c, status, message)
 	}
-	if !validRepositoryURL(url) {
+	if !ValidRepositoryURL(url) {
 		return respond.Error(c, fiber.StatusBadGateway, "GitHub did not return a repository url")
 	}
 	if err := queries.SetGenerationGitHubURL(c.Context(), db.SetGenerationGitHubURLParams{

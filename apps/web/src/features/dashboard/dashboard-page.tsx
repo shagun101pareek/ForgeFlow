@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/api-error";
+import { repositoryURL } from "@/features/project/publish-dialog";
 import { deleteProject, listProjects } from "@/services/projects";
 import type { Project } from "@/store/project";
 
@@ -89,6 +90,23 @@ export function DashboardPage() {
   );
 }
 
+function RepositoryLink({ url }: { url: string | undefined }) {
+  const href = url ? repositoryURL(url) : null;
+  if (!href) {
+    return null;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-2 block truncate text-xs underline"
+    >
+      {href.replace("https://github.com/", "")}
+    </a>
+  );
+}
+
 function OutcomeLabel({ status }: { status: string | undefined }) {
   if (status === "queued" || status === "running") {
     return <span className="font-medium">Running. </span>;
@@ -122,27 +140,30 @@ function ProjectCard({ project }: { project: Project }) {
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
-          <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
-            <CardTitle className="truncate">{project.name}</CardTitle>
-            {project.description ? (
-              <CardDescription className="mt-1 line-clamp-2">
-                {project.description}
-              </CardDescription>
-            ) : null}
-            <p
-              className={`mt-3 line-clamp-2 text-sm ${
-                project.latestPrompt ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <OutcomeLabel status={project.latestStatus} />
-              {project.latestPrompt ?? "Nothing generated yet."}
-            </p>
-            {updated ? (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Updated {updated}
+          <div className="min-w-0 flex-1">
+            <Link href={`/projects/${project.id}`} className="block">
+              <CardTitle className="truncate">{project.name}</CardTitle>
+              {project.description ? (
+                <CardDescription className="mt-1 line-clamp-2">
+                  {project.description}
+                </CardDescription>
+              ) : null}
+              <p
+                className={`mt-3 line-clamp-2 text-sm ${
+                  project.latestPrompt ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <OutcomeLabel status={project.latestStatus} />
+                {project.latestPrompt ?? "Nothing generated yet."}
               </p>
-            ) : null}
-          </Link>
+              {updated ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Updated {updated}
+                </p>
+              ) : null}
+            </Link>
+            <RepositoryLink url={project.latestRepository} />
+          </div>
           <AlertDialog open={open} onOpenChange={setOpen}>
             <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>
               Delete

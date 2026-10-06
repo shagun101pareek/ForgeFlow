@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/api-error";
 import { publishGeneration } from "@/services/generation";
 
-function repositoryURL(value: string) {
+export function repositoryURL(value: string) {
   try {
     const parsed = new URL(value);
     if (
