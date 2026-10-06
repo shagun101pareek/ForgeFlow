@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardDescription,
@@ -32,16 +33,21 @@ import { AccountMenu } from "./account-menu";
 import { CreateProjectDialog } from "./create-project-dialog";
 
 export function DashboardPage() {
+  const [query, setQuery] = useState("");
   const projects = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
-    refetchInterval: (query) =>
-      query.state.data?.some((project) =>
+    refetchInterval: (projectsQuery) =>
+      projectsQuery.state.data?.some((project) =>
         project.latestStatus === "queued" || project.latestStatus === "running",
       )
         ? 1000
         : false,
   });
+  const needle = query.trim().toLowerCase();
+  const visible = (projects.data ?? []).filter((project) =>
+    projectMatches(project, needle),
+  );
 
   return (
     <div className="flex flex-1 flex-col">
@@ -77,8 +83,20 @@ export function DashboardPage() {
           </div>
         ) : null}
         {projects.data && projects.data.length > 0 ? (
+          <Input
+            aria-label="Find a project"
+            placeholder="Find by name or prompt"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="max-w-sm"
+          />
+        ) : null}
+        {projects.data && projects.data.length > 0 && visible.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No projects match that search.</p>
+        ) : null}
+        {visible.length > 0 ? (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.data.map((project) => (
+            {visible.map((project) => (
               <li key={project.id}>
                 <ProjectCard project={project} />
               </li>
@@ -87,6 +105,16 @@ export function DashboardPage() {
         ) : null}
       </main>
     </div>
+  );
+}
+
+function projectMatches(project: Project, needle: string) {
+  if (!needle) {
+    return true;
+  }
+  return (
+    project.name.toLowerCase().includes(needle) ||
+    (project.latestPrompt ?? "").toLowerCase().includes(needle)
   );
 }
 
