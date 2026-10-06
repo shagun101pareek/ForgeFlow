@@ -177,7 +177,7 @@ func (c GitHubClient) request(ctx context.Context, token, method, path string, b
 	return res.StatusCode, message, nil
 }
 
-func validRepositoryURL(raw string) bool {
+func ValidRepositoryURL(raw string) bool {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" {
 		return false

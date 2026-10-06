@@ -7,6 +7,7 @@ export type Project = {
   hasImage?: boolean;
   latestPrompt?: string;
   latestStatus?: string;
+  latestRepository?: string;
   updatedAt?: string;
 };
 

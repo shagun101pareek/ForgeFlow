@@ -86,7 +86,7 @@ func TestGitHubPublishReportsATakenName(t *testing.T) {
 }
 
 func TestValidRepositoryURL(t *testing.T) {
-	if !validRepositoryURL("https://github.com/ada/forgeflow-north-star") {
+	if !ValidRepositoryURL("https://github.com/ada/forgeflow-north-star") {
 		t.Fatal("expected a repository url")
 	}
 	for _, raw := range []string{
@@ -97,7 +97,7 @@ func TestValidRepositoryURL(t *testing.T) {
 		"https://github.com/ada",
 		"https://example.com/ada/repo",
 	} {
-		if validRepositoryURL(raw) {
+		if ValidRepositoryURL(raw) {
 			t.Fatalf("accepted %s", raw)
 		}
 	}

@@ -7,10 +7,11 @@ SELECT
     p.updated_at,
     (p.image IS NOT NULL)::boolean AS has_image,
     COALESCE(latest.prompt, '') AS latest_prompt,
-    COALESCE(latest.status, '') AS latest_status
+    COALESCE(latest.status, '') AS latest_status,
+    COALESCE(latest.github_url, '') AS latest_repository
 FROM projects p
 LEFT JOIN LATERAL (
-    SELECT g.prompt, g.status
+    SELECT g.prompt, g.status, g.github_url
     FROM generations g
     WHERE g.project_id = p.id
     ORDER BY g.created_at DESC
