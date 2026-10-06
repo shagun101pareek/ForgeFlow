@@ -27,6 +27,11 @@ export async function updateProject(id: string, input: UpdateProjectInput) {
   return data;
 }
 
+export async function duplicateProject(id: string) {
+  const { data } = await api.post<Project>(`/api/v1/projects/${id}/duplicate`);
+  return data;
+}
+
 export async function deleteProject(id: string) {
   await api.delete(`/api/v1/projects/${id}`);
 }

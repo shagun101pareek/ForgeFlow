@@ -50,6 +50,14 @@ UPDATE generations
 SET github_url = $2
 WHERE id = $1;
 
+-- name: GetLatestCompletedGenerationForUserProject :one
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
+FROM generations g
+JOIN projects p ON p.id = g.project_id
+WHERE g.project_id = $1 AND p.user_id = $2 AND g.status = 'completed'
+ORDER BY g.created_at DESC
+LIMIT 1;
+
 -- name: GetLatestGenerationForUserProject :one
 SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g

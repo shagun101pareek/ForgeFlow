@@ -162,6 +162,37 @@ func (q *Queries) GetGenerationForUser(ctx context.Context, arg GetGenerationFor
 	return i, err
 }
 
+const getLatestCompletedGenerationForUserProject = `-- name: GetLatestCompletedGenerationForUserProject :one
+SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
+FROM generations g
+JOIN projects p ON p.id = g.project_id
+WHERE g.project_id = $1 AND p.user_id = $2 AND g.status = 'completed'
+ORDER BY g.created_at DESC
+LIMIT 1
+`
+
+type GetLatestCompletedGenerationForUserProjectParams struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+}
+
+func (q *Queries) GetLatestCompletedGenerationForUserProject(ctx context.Context, arg GetLatestCompletedGenerationForUserProjectParams) (Generation, error) {
+	row := q.db.QueryRow(ctx, getLatestCompletedGenerationForUserProject, arg.ProjectID, arg.UserID)
+	var i Generation
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Prompt,
+		&i.Specification,
+		&i.Files,
+		&i.CreatedAt,
+		&i.Status,
+		&i.ErrorMessage,
+		&i.GithubUrl,
+	)
+	return i, err
+}
+
 const getLatestGenerationForUserProject = `-- name: GetLatestGenerationForUserProject :one
 SELECT g.id, g.project_id, g.prompt, g.specification, g.files, g.created_at, g.status, g.error_message, g.github_url
 FROM generations g

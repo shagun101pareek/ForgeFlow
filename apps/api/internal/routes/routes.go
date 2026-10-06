@@ -93,6 +93,7 @@ func Register(app *fiber.App, deps Dependencies) {
 	protected.Post("/:id/image", projectHandler.UploadImage)
 	protected.Get("/:id/image", projectHandler.GetImage)
 	protected.Delete("/:id/image", projectHandler.ClearImage)
+	protected.Post("/:id/duplicate", projectHandler.Duplicate)
 	protected.Get("/:id", projectHandler.Get)
 	protected.Patch("/:id", projectHandler.Update)
 	protected.Delete("/:id", projectHandler.Delete)

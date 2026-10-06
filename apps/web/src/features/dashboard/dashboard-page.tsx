@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/api-error";
 import { repositoryURL } from "@/features/project/publish-dialog";
-import { deleteProject, listProjects } from "@/services/projects";
+import { deleteProject, duplicateProject, listProjects } from "@/services/projects";
 import type { Project } from "@/store/project";
 
 import { AccountMenu } from "./account-menu";
@@ -152,6 +152,17 @@ function ProjectCard({ project }: { project: Project }) {
     ? new Date(project.updatedAt).toLocaleString()
     : null;
 
+  const duplicate = useMutation({
+    mutationFn: () => duplicateProject(project.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Project duplicated");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Could not duplicate project"));
+    },
+  });
+
   const mutation = useMutation({
     mutationFn: () => deleteProject(project.id),
     onSuccess: async () => {
@@ -192,8 +203,20 @@ function ProjectCard({ project }: { project: Project }) {
             </Link>
             <RepositoryLink url={project.latestRepository} />
           </div>
-          <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => duplicate.mutate()}
+              disabled={duplicate.isPending || mutation.isPending}
+            >
+              {duplicate.isPending ? "Copying…" : "Duplicate"}
+            </Button>
+            <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger
+              render={<Button variant="ghost" size="sm" disabled={duplicate.isPending} />}
+            >
               Delete
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -214,7 +237,8 @@ function ProjectCard({ project }: { project: Project }) {
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
-          </AlertDialog>
+            </AlertDialog>
+          </div>
         </div>
       </CardHeader>
     </Card>
