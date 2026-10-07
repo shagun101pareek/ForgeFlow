@@ -76,6 +76,10 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const [openingVersionId, setOpeningVersionId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingLoss, setPendingLoss] = useState<
+    { kind: "generate" } | { kind: "open"; id: string } | null
+  >(null);
+  const pendingLossRef = useRef(pendingLoss);
   const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const name = draftName ?? project.data?.name ?? "";
@@ -174,7 +178,45 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       toast.error("Enter a prompt first");
       return;
     }
+    if (unsaved) {
+      const next = { kind: "generate" as const };
+      pendingLossRef.current = next;
+      setPendingLoss(next);
+      return;
+    }
     generation.mutate({ projectId, prompt: nextPrompt });
+  }
+
+  function requestOpenVersion(id: string) {
+    if (id === generationId || openingVersionId) {
+      return;
+    }
+    if (unsaved) {
+      const next = { kind: "open" as const, id };
+      pendingLossRef.current = next;
+      setPendingLoss(next);
+      return;
+    }
+    void openVersion(id);
+  }
+
+  function confirmLoss() {
+    const next = pendingLossRef.current;
+    pendingLossRef.current = null;
+    setPendingLoss(null);
+    if (!next) {
+      return;
+    }
+    if (next.kind === "generate") {
+      const nextPrompt = prompt.trim();
+      if (!nextPrompt) {
+        toast.error("Enter a prompt first");
+        return;
+      }
+      generation.mutate({ projectId, prompt: nextPrompt });
+      return;
+    }
+    void openVersion(next.id);
   }
 
   async function discardVersion(id: string) {
@@ -395,7 +437,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
                   version={version}
                   selected={version.id === generationId}
                   opening={openingVersionId === version.id}
-                  onOpen={() => void openVersion(version.id)}
+                  onOpen={() => requestOpenVersion(version.id)}
                   onDiscard={() => discardVersion(version.id)}
                 />
               ))}
@@ -510,6 +552,29 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           ) : null}
         </aside>
       </div>
+      <AlertDialog
+        open={pendingLoss !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingLoss(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved edits?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Source changes on this version are not saved. Continuing drops them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmLoss}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
