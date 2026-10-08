@@ -21,7 +21,8 @@ func GenerateFiles(spec Spec) []File {
 
 func generateApp(spec Spec) string {
 	var b strings.Builder
-	b.WriteString(`import "./styles.css";
+	theme := themeClass(spec)
+	b.WriteString(fmt.Sprintf(`import "./styles.css";
 import { useState } from "react";
 
 const INITIAL_ROUTE = "/";
@@ -31,8 +32,8 @@ export default function App() {
   const [notice, setNotice] = useState("");
 
   return (
-    <div className="app">
-`)
+    <div className="app %s">
+`, theme))
 
 	used := map[string]struct{}{"App": {}, "Nav": {}}
 	names := make([]string, len(spec.Pages))
@@ -93,7 +94,7 @@ export default function App() {
 			if section.Type == "navbar" {
 				continue
 			}
-			b.WriteString(renderSection(section, routes))
+			b.WriteString(renderSection(section, routes, theme))
 		}
 		b.WriteString("      </main>\n    </>\n  );\n}\n\n")
 	}
@@ -101,12 +102,54 @@ export default function App() {
 	return b.String()
 }
 
-func renderSection(section Section, routes map[string]struct{}) string {
+func themeClass(spec Spec) string {
+	hasStats := false
+	pricingOnHome := false
+	hasPricing := false
+	for _, page := range spec.Pages {
+		for _, section := range page.Sections {
+			switch section.Type {
+			case "stats":
+				hasStats = true
+			case "pricing":
+				hasPricing = true
+				if page.Route == "/" {
+					pricingOnHome = true
+				}
+			}
+		}
+	}
+	switch {
+	case hasStats:
+		return "theme-dashboard"
+	case pricingOnHome:
+		return "theme-pricing"
+	case !hasPricing:
+		return "theme-portfolio"
+	default:
+		return "theme-landing"
+	}
+}
+
+func eyebrow(theme string) string {
+	switch theme {
+	case "theme-dashboard":
+		return "Overview"
+	case "theme-portfolio":
+		return "Selected work"
+	case "theme-pricing":
+		return "Plans"
+	default:
+		return "Product"
+	}
+}
+
+func renderSection(section Section, routes map[string]struct{}, theme string) string {
 	switch section.Type {
 	case "hero":
 		return fmt.Sprintf(`        <section className="hero">
           %s
-          <p className="eyebrow">Prototype</p>
+          <p className="eyebrow">%s</p>
           <h1>%s</h1>
           %s
           <div className="actions">
@@ -114,7 +157,7 @@ func renderSection(section Section, routes map[string]struct{}) string {
             %s
           </div>
         </section>
-`, heroImage(section.Image), jsText(section.Title), paragraph(section.Subtitle), actionButton("btn", section.PrimaryLabel, section.PrimaryRoute, routes), actionButton("btn secondary", section.SecondaryLabel, section.SecondaryRoute, routes))
+`, heroImage(section.Image), jsText(eyebrow(theme)), jsText(section.Title), paragraph(section.Subtitle), actionButton("btn", section.PrimaryLabel, section.PrimaryRoute, routes), actionButton("btn secondary", section.SecondaryLabel, section.SecondaryRoute, routes))
 	case "features":
 		return fmt.Sprintf(`        <section className="section">
           <h2>%s</h2>
@@ -207,8 +250,12 @@ func featureCards(items []Item) string {
 
 func pricingCards(items []Item, routes map[string]struct{}) string {
 	var b strings.Builder
-	for _, item := range items {
-		b.WriteString(fmt.Sprintf(`            <article className="card price">
+	for i, item := range items {
+		className := "card price"
+		if len(items) >= 3 && i == len(items)/2 {
+			className = "card price featured"
+		}
+		b.WriteString(fmt.Sprintf(`            <article className="%s">
               <h3>%s</h3>
               <p className="amount">%s</p>
               <ul>
@@ -216,7 +263,7 @@ func pricingCards(items []Item, routes map[string]struct{}) string {
               </ul>
               %s
             </article>
-`, jsText(item.Title), jsText(item.Price), featureList(item.Description), actionButton("btn", "Choose "+item.Title, item.Route, routes)))
+`, className, jsText(item.Title), jsText(item.Price), featureList(item.Description), actionButton("btn", "Choose "+item.Title, item.Route, routes)))
 	}
 	return b.String()
 }
@@ -475,6 +522,67 @@ h2 { font-size: 32px; }
 
 @media (max-width: 720px) {
   h1 { font-size: 36px; }
+  .theme-portfolio h1 { font-size: 44px; }
   .nav { align-items: flex-start; flex-direction: column; }
+  .theme-dashboard .stats { grid-template-columns: 1fr; }
+  .theme-pricing .price.featured { transform: none; }
 }
+
+.theme-landing {
+  background:
+    radial-gradient(900px 420px at 10% -10%, #e7ebff 0%, transparent 60%),
+    #f6f7fb;
+}
+.theme-landing .hero { padding-top: 64px; }
+.theme-landing .btn { background: #2f3ec9; }
+.theme-landing .eyebrow { color: #2f3ec9; }
+
+.theme-dashboard { background: #e7edf4; color: #142033; }
+.theme-dashboard .nav { background: #142033; border-bottom: 0; }
+.theme-dashboard .brand { color: #f8fafc; }
+.theme-dashboard .link { color: #c5d0de; }
+.theme-dashboard .link.active, .theme-dashboard .link:hover { background: #243246; color: #ffffff; }
+.theme-dashboard h1 { font-size: 34px; max-width: none; }
+.theme-dashboard .hero { padding: 28px 0 8px; }
+.theme-dashboard .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.theme-dashboard .stats div { border: 0; border-top: 4px solid #3b82f6; border-radius: 12px; }
+.theme-dashboard .card { border-radius: 12px; background: #f8fafc; }
+.theme-dashboard .btn { background: #142033; border-radius: 10px; }
+
+.theme-portfolio { background: #f6f1e8; color: #1c1612; font-family: Georgia, "Iowan Old Style", serif; }
+.theme-portfolio .nav { background: transparent; border-bottom: 0; position: static; }
+.theme-portfolio .brand { font-family: Georgia, serif; font-size: 18px; font-weight: 500; }
+.theme-portfolio .link { border-radius: 0; color: #1c1612; padding-left: 0; padding-right: 0; }
+.theme-portfolio .link.active, .theme-portfolio .link:hover { background: transparent; text-decoration: underline; }
+.theme-portfolio h1 { font-size: 68px; font-weight: 500; max-width: 12ch; }
+.theme-portfolio .eyebrow { color: #8a5a32; letter-spacing: 0.14em; }
+.theme-portfolio .grid { flex-direction: column; }
+.theme-portfolio .card {
+  flex-basis: auto;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #d9cbb8;
+  border-radius: 0;
+  padding: 22px 0;
+}
+.theme-portfolio .btn { background: #1c1612; border-radius: 0; }
+.theme-portfolio .btn.secondary { background: transparent; color: #1c1612; border: 1px solid #1c1612; }
+
+.theme-pricing { background: #f3f7f4; }
+.theme-pricing .hero, .theme-pricing .section, .theme-pricing .cta { text-align: center; }
+.theme-pricing h1 { margin-left: auto; margin-right: auto; }
+.theme-pricing .actions, .theme-pricing .grid { justify-content: center; }
+.theme-pricing .eyebrow { color: #0f6b4c; }
+.theme-pricing .btn { background: #0f6b4c; }
+.theme-pricing .price { flex: 1 1 200px; max-width: 280px; }
+.theme-pricing .price.featured {
+  background: #12382c;
+  color: #f4fbf7;
+  border-color: #12382c;
+  transform: translateY(-12px);
+}
+.theme-pricing .price.featured .amount,
+.theme-pricing .price.featured h3,
+.theme-pricing .price.featured ul { color: #f4fbf7; }
+.theme-pricing .price.featured .btn { background: #ffffff; color: #12382c; }
 `

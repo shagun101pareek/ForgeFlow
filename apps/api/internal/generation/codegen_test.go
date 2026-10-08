@@ -41,6 +41,28 @@ func TestNormalizeKeepsInteractivePages(t *testing.T) {
 	}
 }
 
+func TestThemeClassMatchesTheFourLayouts(t *testing.T) {
+	cases := []struct {
+		spec Spec
+		want string
+	}{
+		{dashboardSpec("Northwind"), "theme-dashboard"},
+		{portfolioSpec("Northwind"), "theme-portfolio"},
+		{pricingSpec("Northwind"), "theme-pricing"},
+		{landingSpec("Northwind"), "theme-landing"},
+	}
+	for _, tc := range cases {
+		code := GenerateFiles(tc.spec)[0].Code
+		if !strings.Contains(code, tc.want) {
+			t.Fatalf("missing %s", tc.want)
+		}
+	}
+	pricing := GenerateFiles(pricingSpec("Northwind"))[0].Code
+	if !strings.Contains(pricing, "price featured") {
+		t.Fatal("middle plan was not featured")
+	}
+}
+
 func TestCodegenEmitsInteractiveApp(t *testing.T) {
 	spec, err := Normalize(Spec{
 		Project: Project{Name: "AI Notes"},
