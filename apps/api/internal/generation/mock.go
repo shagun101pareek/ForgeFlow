@@ -12,16 +12,18 @@ func (Mock) GenerateSpec(_ context.Context, projectName, prompt string) (Spec, e
 	if name == "" {
 		name = "ForgeFlow"
 	}
+	var spec Spec
 	switch classifyPrompt(prompt) {
 	case "dashboard":
-		return dashboardSpec(name), nil
+		spec = dashboardSpec(name)
 	case "portfolio":
-		return portfolioSpec(name), nil
+		spec = portfolioSpec(name)
 	case "pricing":
-		return pricingSpec(name), nil
+		spec = pricingSpec(name)
 	default:
-		return landingSpec(name), nil
+		spec = landingSpec(name)
 	}
+	return shapeSpec(spec, name, prompt), nil
 }
 
 func classifyPrompt(prompt string) string {
@@ -300,6 +302,148 @@ func pricingSpec(name string) Spec {
 					},
 				},
 			},
+		},
+	}
+}
+
+func shapeSpec(spec Spec, name, prompt string) Spec {
+	text := strings.ToLower(prompt)
+	wantTestimonials := strings.Contains(text, "testimonial") || strings.Contains(text, "quotes")
+	wantFAQ := strings.Contains(text, "faq") || strings.Contains(text, "question")
+	wantStats := strings.Contains(text, "stats") || strings.Contains(text, "statistics") || strings.Contains(text, "metrics")
+
+	if wantTestimonials {
+		spec = ensureSection(spec, "/", "features", testimonialSection(name))
+	} else {
+		spec = dropSection(spec, "testimonials")
+	}
+	if wantFAQ {
+		spec = ensureFAQ(spec, name)
+	} else {
+		spec = dropSection(spec, "faq")
+	}
+	if wantStats {
+		spec = ensureSection(spec, "/", "hero", statsSection())
+	}
+	return spec
+}
+
+func dropSection(spec Spec, sectionType string) Spec {
+	for i, page := range spec.Pages {
+		kept := make([]Section, 0, len(page.Sections))
+		for _, section := range page.Sections {
+			if section.Type != sectionType {
+				kept = append(kept, section)
+			}
+		}
+		spec.Pages[i].Sections = kept
+	}
+	return spec
+}
+
+func ensureSection(spec Spec, route, after string, section Section) Spec {
+	if hasSection(spec, section.Type) {
+		return spec
+	}
+	for i, page := range spec.Pages {
+		if page.Route != route {
+			continue
+		}
+		spec.Pages[i] = insertAfter(page, after, section)
+		return spec
+	}
+	if len(spec.Pages) == 0 {
+		return spec
+	}
+	spec.Pages[0] = insertAfter(spec.Pages[0], after, section)
+	return spec
+}
+
+func ensureFAQ(spec Spec, name string) Spec {
+	if hasSection(spec, "faq") {
+		return spec
+	}
+	section := faqSection(name)
+	for i, page := range spec.Pages {
+		for _, existing := range page.Sections {
+			if existing.Type == "pricing" {
+				spec.Pages[i] = insertAfter(page, "pricing", section)
+				return spec
+			}
+		}
+	}
+	return ensureSection(spec, "/", "features", section)
+}
+
+func insertAfter(page Page, after string, section Section) Page {
+	out := make([]Section, 0, len(page.Sections)+1)
+	inserted := false
+	for _, existing := range page.Sections {
+		out = append(out, existing)
+		if !inserted && existing.Type == after {
+			out = append(out, section)
+			inserted = true
+		}
+	}
+	if inserted {
+		page.Sections = out
+		return page
+	}
+	out = out[:0]
+	for _, existing := range page.Sections {
+		if existing.Type == "footer" {
+			out = append(out, section)
+		}
+		out = append(out, existing)
+	}
+	if len(out) == len(page.Sections) {
+		out = append(out, section)
+	}
+	page.Sections = out
+	return page
+}
+
+func hasSection(spec Spec, sectionType string) bool {
+	for _, page := range spec.Pages {
+		for _, section := range page.Sections {
+			if section.Type == sectionType {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func testimonialSection(name string) Section {
+	return Section{
+		Type:  "testimonials",
+		Title: "Notes on " + name,
+		Items: []Item{
+			{Title: "Ava Chen", Description: "The page was something people could click through, not a static mockup."},
+			{Title: "Noah Patel", Description: "We could see the flow without leaving the preview."},
+		},
+	}
+}
+
+func faqSection(name string) Section {
+	return Section{
+		Type:  "faq",
+		Title: "Questions",
+		Items: []Item{
+			{Title: "Where do I start?", Description: "Create an account and open the " + name + " workspace."},
+			{Title: "Can I change this later?", Description: "Yes. The preview stays editable after you generate it."},
+		},
+	}
+}
+
+func statsSection() Section {
+	return Section{
+		Type:  "stats",
+		Title: "At a glance",
+		Items: []Item{
+			{Title: "12", Description: "Active projects"},
+			{Title: "4", Description: "Waiting for review"},
+			{Title: "28", Description: "Previews this week"},
 		},
 	}
 }

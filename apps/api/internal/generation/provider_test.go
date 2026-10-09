@@ -19,9 +19,14 @@ func TestMockProviderReturnsExistingSpec(t *testing.T) {
 	}
 
 	types := sectionTypes(spec)
-	for _, want := range []string{"navbar", "hero", "features", "testimonials", "cta", "pricing", "signup", "footer"} {
+	for _, want := range []string{"navbar", "hero", "features", "cta", "pricing", "signup", "footer"} {
 		if !strings.Contains(types, want) {
 			t.Fatalf("spec missing %s in %s", want, types)
+		}
+	}
+	for _, absent := range []string{"testimonials", "faq", "stats"} {
+		if strings.Contains(types, absent) {
+			t.Fatalf("default landing included %s", absent)
 		}
 	}
 
@@ -35,6 +40,41 @@ func TestMockProviderReturnsExistingSpec(t *testing.T) {
 	}
 	if !strings.Contains(files[0].Code, "setRoute") || !strings.Contains(files[0].Code, `type="email"`) {
 		t.Fatal("mock spec did not reach the code generator")
+	}
+}
+
+func TestPromptAddsRequestedSections(t *testing.T) {
+	plain, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A SaaS landing page for a product team")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plainTypes := sectionTypes(plain)
+	for _, absent := range []string{"testimonials", "faq", "stats"} {
+		if strings.Contains(plainTypes, absent) {
+			t.Fatalf("plain landing included %s", absent)
+		}
+	}
+
+	asked, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A SaaS landing page with testimonials, an FAQ, and stats")
+	if err != nil {
+		t.Fatal(err)
+	}
+	askedTypes := sectionTypes(asked)
+	for _, want := range []string{"testimonials", "faq", "stats"} {
+		if !strings.Contains(askedTypes, want) {
+			t.Fatalf("requested landing missing %s in %s", want, askedTypes)
+		}
+	}
+	if themeClass(asked) != "theme-landing" {
+		t.Fatalf("theme = %s", themeClass(asked))
+	}
+
+	dashboard, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A team dashboard for active projects")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sectionTypes(dashboard), "stats") || themeClass(dashboard) != "theme-dashboard" {
+		t.Fatalf("dashboard = %s %s", themeClass(dashboard), sectionTypes(dashboard))
 	}
 }
 
