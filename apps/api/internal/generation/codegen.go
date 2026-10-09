@@ -120,10 +120,10 @@ func themeClass(spec Spec) string {
 		}
 	}
 	switch {
-	case hasStats:
-		return "theme-dashboard"
 	case pricingOnHome:
 		return "theme-pricing"
+	case hasStats && !hasPricing:
+		return "theme-dashboard"
 	case !hasPricing:
 		return "theme-portfolio"
 	default:
