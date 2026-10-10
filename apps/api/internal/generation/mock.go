@@ -3,6 +3,7 @@ package generation
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 )
 
 type Mock struct{}
@@ -325,7 +326,56 @@ func shapeSpec(spec Spec, name, prompt string) Spec {
 	if wantStats {
 		spec = ensureSection(spec, "/", "hero", statsSection())
 	}
+	return applyHeroCopy(spec, prompt)
+}
+
+const maxHeroSentence = 140
+
+func applyHeroCopy(spec Spec, prompt string) Spec {
+	subtitle := promptSentence(prompt)
+	if subtitle == "" {
+		return spec
+	}
+	for i, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for j, section := range page.Sections {
+			if section.Type != "hero" {
+				continue
+			}
+			spec.Pages[i].Sections[j].Subtitle = subtitle
+			return spec
+		}
+	}
 	return spec
+}
+
+func promptSentence(prompt string) string {
+	text := strings.Join(strings.Fields(prompt), " ")
+	if text == "" {
+		return ""
+	}
+	end := len(text)
+	for i, r := range text {
+		if r == '.' || r == '!' || r == '?' {
+			end = i + utf8.RuneLen(r)
+			break
+		}
+	}
+	sentence := text[:end]
+	if utf8.RuneCountInString(sentence) <= maxHeroSentence {
+		return sentence
+	}
+	runes := []rune(sentence)
+	cut := maxHeroSentence
+	for cut > 0 && runes[cut-1] != ' ' {
+		cut--
+	}
+	if cut == 0 {
+		cut = maxHeroSentence
+	}
+	return strings.TrimSpace(string(runes[:cut]))
 }
 
 func dropSection(spec Spec, sectionType string) Spec {
