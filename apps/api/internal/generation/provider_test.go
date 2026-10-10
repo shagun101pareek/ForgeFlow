@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestMockProviderReturnsExistingSpec(t *testing.T) {
@@ -86,7 +87,7 @@ func TestMockProviderPatternsAreDeterministic(t *testing.T) {
 		{prompt: "landing page", want: "keeps the work moving"},
 		{prompt: "SaaS landing page with pricing", want: "keeps the work moving"},
 		{prompt: "team dashboard", want: "overview"},
-		{prompt: "design portfolio", want: "Selected product work"},
+		{prompt: "design portfolio", want: "Selected projects"},
 		{prompt: "pricing page", want: "Pricing for"},
 		{prompt: "something else", want: "keeps the work moving"},
 	}
@@ -106,6 +107,54 @@ func TestMockProviderPatternsAreDeterministic(t *testing.T) {
 		if !strings.Contains(specText(first), tc.want) {
 			t.Fatalf("%s produced %s", tc.prompt, specText(first))
 		}
+	}
+}
+
+func TestHeroSubtitleUsesThePrompt(t *testing.T) {
+	notes, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A quiet notes app for people who write every morning.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bakery, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A neighborhood bakery with seasonal bread and a weekend market.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if heroSubtitle(notes) == heroSubtitle(bakery) {
+		t.Fatal("two landing prompts shared a subtitle")
+	}
+	if heroSubtitle(notes) != "A quiet notes app for people who write every morning." {
+		t.Fatalf("subtitle = %q", heroSubtitle(notes))
+	}
+	if heroTitle(notes) != "Northstar keeps the work moving" || heroTitle(notes) != heroTitle(bakery) {
+		t.Fatalf("headline = %q", heroTitle(notes))
+	}
+	if sectionTypes(notes) != sectionTypes(bakery) {
+		t.Fatalf("sections changed: %s vs %s", sectionTypes(notes), sectionTypes(bakery))
+	}
+
+	multi, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "Ship a notes app. Ignore this second sentence.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if heroSubtitle(multi) != "Ship a notes app." {
+		t.Fatalf("subtitle = %q", heroSubtitle(multi))
+	}
+
+	long := strings.Repeat("seasonal ", 30)
+	clipped, err := Mock{}.GenerateSpec(context.Background(), "Northstar", long)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := utf8.RuneCountInString(heroSubtitle(clipped)); n == 0 || n > maxHeroSentence {
+		t.Fatalf("subtitle length = %d (%q)", n, heroSubtitle(clipped))
+	}
+
+	blank, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "   ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if heroSubtitle(blank) != "A focused workspace for teams that want a clear product story, a simple signup, and a plan that fits." {
+		t.Fatalf("blank prompt subtitle = %q", heroSubtitle(blank))
 	}
 }
 
@@ -136,6 +185,28 @@ func TestProviderSelection(t *testing.T) {
 	if _, err := NewProvider("local", ""); err == nil {
 		t.Fatal("unknown provider was accepted")
 	}
+}
+
+func heroSection(spec Spec) Section {
+	for _, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for _, section := range page.Sections {
+			if section.Type == "hero" {
+				return section
+			}
+		}
+	}
+	return Section{}
+}
+
+func heroTitle(spec Spec) string {
+	return heroSection(spec).Title
+}
+
+func heroSubtitle(spec Spec) string {
+	return heroSection(spec).Subtitle
 }
 
 func sectionTypes(spec Spec) string {
