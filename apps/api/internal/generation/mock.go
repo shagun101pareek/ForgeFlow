@@ -329,10 +329,14 @@ func shapeSpec(spec Spec, name, prompt string) Spec {
 	return applyHeroCopy(spec, prompt)
 }
 
-const maxHeroSentence = 140
+const (
+	maxHeroSentence   = 140
+	maxHeroTitleWords = 6
+)
 
 func applyHeroCopy(spec Spec, prompt string) Spec {
 	subtitle := promptSentence(prompt)
+	title := promptTitle(prompt)
 	if subtitle == "" {
 		return spec
 	}
@@ -344,11 +348,23 @@ func applyHeroCopy(spec Spec, prompt string) Spec {
 			if section.Type != "hero" {
 				continue
 			}
+			if title != "" {
+				spec.Pages[i].Sections[j].Title = title
+			}
 			spec.Pages[i].Sections[j].Subtitle = subtitle
 			return spec
 		}
 	}
 	return spec
+}
+
+func promptTitle(prompt string) string {
+	sentence := strings.TrimRight(promptSentence(prompt), ".!?")
+	words := strings.Fields(sentence)
+	if len(words) > maxHeroTitleWords {
+		words = words[:maxHeroTitleWords]
+	}
+	return strings.Join(words, " ")
 }
 
 func promptSentence(prompt string) string {
