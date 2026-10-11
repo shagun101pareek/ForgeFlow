@@ -84,12 +84,12 @@ func TestMockProviderPatternsAreDeterministic(t *testing.T) {
 		prompt string
 		want   string
 	}{
-		{prompt: "landing page", want: "keeps the work moving"},
-		{prompt: "SaaS landing page with pricing", want: "keeps the work moving"},
-		{prompt: "team dashboard", want: "overview"},
+		{prompt: "landing page", want: "Built for the first version"},
+		{prompt: "SaaS landing page with pricing", want: "Built for the first version"},
+		{prompt: "team dashboard", want: "Recent work"},
 		{prompt: "design portfolio", want: "Selected projects"},
-		{prompt: "pricing page", want: "Pricing for"},
-		{prompt: "something else", want: "keeps the work moving"},
+		{prompt: "pricing page", want: "Start with a plan"},
+		{prompt: "something else", want: "Built for the first version"},
 	}
 
 	for _, tc := range prompts {
@@ -125,8 +125,11 @@ func TestHeroSubtitleUsesThePrompt(t *testing.T) {
 	if heroSubtitle(notes) != "A quiet notes app for people who write every morning." {
 		t.Fatalf("subtitle = %q", heroSubtitle(notes))
 	}
-	if heroTitle(notes) != "Northstar keeps the work moving" || heroTitle(notes) != heroTitle(bakery) {
+	if heroTitle(notes) != "A quiet notes app for people" {
 		t.Fatalf("headline = %q", heroTitle(notes))
+	}
+	if heroTitle(bakery) != "A neighborhood bakery with seasonal bread" {
+		t.Fatalf("headline = %q", heroTitle(bakery))
 	}
 	if sectionTypes(notes) != sectionTypes(bakery) {
 		t.Fatalf("sections changed: %s vs %s", sectionTypes(notes), sectionTypes(bakery))
@@ -138,6 +141,9 @@ func TestHeroSubtitleUsesThePrompt(t *testing.T) {
 	}
 	if heroSubtitle(multi) != "Ship a notes app." {
 		t.Fatalf("subtitle = %q", heroSubtitle(multi))
+	}
+	if heroTitle(multi) != "Ship a notes app" {
+		t.Fatalf("headline = %q", heroTitle(multi))
 	}
 
 	long := strings.Repeat("seasonal ", 30)
@@ -155,6 +161,9 @@ func TestHeroSubtitleUsesThePrompt(t *testing.T) {
 	}
 	if heroSubtitle(blank) != "A focused workspace for teams that want a clear product story, a simple signup, and a plan that fits." {
 		t.Fatalf("blank prompt subtitle = %q", heroSubtitle(blank))
+	}
+	if heroTitle(blank) != "Northstar keeps the work moving" {
+		t.Fatalf("blank prompt headline = %q", heroTitle(blank))
 	}
 }
 
