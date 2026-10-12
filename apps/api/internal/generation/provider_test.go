@@ -167,6 +167,57 @@ func TestHeroSubtitleUsesThePrompt(t *testing.T) {
 	}
 }
 
+func TestFeatureCardsUsePromptList(t *testing.T) {
+	plain, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A quiet notes app for people who write every morning.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if titles := featureTitles(plain); titles[0] != "Shared projects" || titles[1] != "Live preview" || titles[2] != "Clear plans" {
+		t.Fatalf("titles = %#v", titles)
+	}
+
+	listed, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A notes app with capture, search, and sharing.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := featureTitles(listed)
+	if len(titles) != 3 || titles[0] != "A notes app with capture" || titles[1] != "search" || titles[2] != "sharing" {
+		t.Fatalf("titles = %#v", titles)
+	}
+	if descs := featureDescriptions(listed); descs[0] != "Keep every prototype in one place instead of a folder of screenshots." || descs[1] != "Click through the generated interface instead of imagining the interactions." || descs[2] != "Show pricing without sending people to a separate document." {
+		t.Fatalf("descriptions = %#v", descs)
+	}
+	if sectionTypes(plain) != sectionTypes(listed) {
+		t.Fatalf("sections changed: %s vs %s", sectionTypes(plain), sectionTypes(listed))
+	}
+
+	partial, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A notes app with capture, search.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	partialTitles := featureTitles(partial)
+	if len(partialTitles) != 3 || partialTitles[0] != "A notes app with capture" || partialTitles[1] != "search" || partialTitles[2] != "Clear plans" {
+		t.Fatalf("titles = %#v", partialTitles)
+	}
+
+	extra, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A notes app with capture, search, sharing, and export.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	extraTitles := featureTitles(extra)
+	if len(extraTitles) != 3 || extraTitles[2] != "sharing" {
+		t.Fatalf("titles = %#v", extraTitles)
+	}
+
+	later, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "Ship a notes app. Then add capture, search, and sharing.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if laterTitles := featureTitles(later); laterTitles[0] != "Shared projects" {
+		t.Fatalf("titles = %#v", laterTitles)
+	}
+}
+
 func TestProviderSelection(t *testing.T) {
 	mockProvider, err := NewProvider("mock", "")
 	if err != nil {
@@ -194,6 +245,38 @@ func TestProviderSelection(t *testing.T) {
 	if _, err := NewProvider("local", ""); err == nil {
 		t.Fatal("unknown provider was accepted")
 	}
+}
+
+func featuresSection(spec Spec) Section {
+	for _, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for _, section := range page.Sections {
+			if section.Type == "features" {
+				return section
+			}
+		}
+	}
+	return Section{}
+}
+
+func featureTitles(spec Spec) []string {
+	items := featuresSection(spec).Items
+	titles := make([]string, len(items))
+	for i, item := range items {
+		titles[i] = item.Title
+	}
+	return titles
+}
+
+func featureDescriptions(spec Spec) []string {
+	items := featuresSection(spec).Items
+	descriptions := make([]string, len(items))
+	for i, item := range items {
+		descriptions[i] = item.Description
+	}
+	return descriptions
 }
 
 func heroSection(spec Spec) Section {
