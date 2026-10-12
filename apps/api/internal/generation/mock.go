@@ -326,12 +326,14 @@ func shapeSpec(spec Spec, name, prompt string) Spec {
 	if wantStats {
 		spec = ensureSection(spec, "/", "hero", statsSection())
 	}
-	return applyHeroCopy(spec, prompt)
+	spec = applyHeroCopy(spec, prompt)
+	return applyFeatureCards(spec, prompt)
 }
 
 const (
 	maxHeroSentence   = 140
 	maxHeroTitleWords = 6
+	maxFeatureCards   = 3
 )
 
 func applyHeroCopy(spec Spec, prompt string) Spec {
@@ -356,6 +358,59 @@ func applyHeroCopy(spec Spec, prompt string) Spec {
 		}
 	}
 	return spec
+}
+
+func applyFeatureCards(spec Spec, prompt string) Spec {
+	titles := promptList(prompt)
+	if len(titles) < 2 {
+		return spec
+	}
+	if len(titles) > maxFeatureCards {
+		titles = titles[:maxFeatureCards]
+	}
+	for i, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for j, section := range page.Sections {
+			if section.Type != "features" {
+				continue
+			}
+			for k := range section.Items {
+				if k >= len(titles) {
+					break
+				}
+				spec.Pages[i].Sections[j].Items[k].Title = titles[k]
+			}
+			return spec
+		}
+	}
+	return spec
+}
+
+func promptList(prompt string) []string {
+	sentence := strings.TrimRight(promptSentence(prompt), ".!?")
+	if !strings.Contains(sentence, ",") {
+		return nil
+	}
+	parts := strings.Split(sentence, ",")
+	titles := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = trimLeadingAnd(part)
+		if part == "" {
+			continue
+		}
+		titles = append(titles, part)
+	}
+	return titles
+}
+
+func trimLeadingAnd(part string) string {
+	fields := strings.Fields(part)
+	if len(fields) > 1 && strings.EqualFold(fields[0], "and") {
+		fields = fields[1:]
+	}
+	return strings.Join(fields, " ")
 }
 
 func promptTitle(prompt string) string {
