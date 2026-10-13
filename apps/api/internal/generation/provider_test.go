@@ -167,6 +167,48 @@ func TestHeroSubtitleUsesThePrompt(t *testing.T) {
 	}
 }
 
+func TestFeatureIntroUsesThePrompt(t *testing.T) {
+	notes, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A quiet notes app for people who write every morning.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bakery, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A neighborhood bakery with seasonal bread and a weekend market.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if featureSubtitle(notes) != heroSubtitle(notes) {
+		t.Fatalf("intro = %q", featureSubtitle(notes))
+	}
+	if featureSubtitle(notes) == featureSubtitle(bakery) {
+		t.Fatal("two landing prompts shared a features sentence")
+	}
+	if featuresSection(notes).Title != "Built for the first version" {
+		t.Fatalf("heading = %q", featuresSection(notes).Title)
+	}
+	if titles := featureTitles(notes); titles[0] != "Shared projects" || titles[1] != "Live preview" || titles[2] != "Clear plans" {
+		t.Fatalf("titles = %#v", titles)
+	}
+	if sectionTypes(notes) != sectionTypes(bakery) {
+		t.Fatalf("sections changed: %s vs %s", sectionTypes(notes), sectionTypes(bakery))
+	}
+
+	multi, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "Ship a notes app. Ignore this second sentence.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if featureSubtitle(multi) != "Ship a notes app." {
+		t.Fatalf("intro = %q", featureSubtitle(multi))
+	}
+
+	blank, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "   ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if featureSubtitle(blank) != "The pieces a SaaS landing page needs before the product gets complicated." {
+		t.Fatalf("blank prompt intro = %q", featureSubtitle(blank))
+	}
+}
+
 func TestFeatureCardsUsePromptList(t *testing.T) {
 	plain, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A quiet notes app for people who write every morning.")
 	if err != nil {
@@ -245,6 +287,10 @@ func TestProviderSelection(t *testing.T) {
 	if _, err := NewProvider("local", ""); err == nil {
 		t.Fatal("unknown provider was accepted")
 	}
+}
+
+func featureSubtitle(spec Spec) string {
+	return featuresSection(spec).Subtitle
 }
 
 func featuresSection(spec Spec) Section {
