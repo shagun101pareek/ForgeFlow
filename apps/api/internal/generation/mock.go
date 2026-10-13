@@ -327,7 +327,8 @@ func shapeSpec(spec Spec, name, prompt string) Spec {
 		spec = ensureSection(spec, "/", "hero", statsSection())
 	}
 	spec = applyHeroCopy(spec, prompt)
-	return applyFeatureCards(spec, prompt)
+	spec = applyFeatureCards(spec, prompt)
+	return applyFeatureIntro(spec, prompt)
 }
 
 const (
@@ -352,6 +353,26 @@ func applyHeroCopy(spec Spec, prompt string) Spec {
 			}
 			if title != "" {
 				spec.Pages[i].Sections[j].Title = title
+			}
+			spec.Pages[i].Sections[j].Subtitle = subtitle
+			return spec
+		}
+	}
+	return spec
+}
+
+func applyFeatureIntro(spec Spec, prompt string) Spec {
+	subtitle := promptSentence(prompt)
+	if subtitle == "" {
+		return spec
+	}
+	for i, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for j, section := range page.Sections {
+			if section.Type != "features" {
+				continue
 			}
 			spec.Pages[i].Sections[j].Subtitle = subtitle
 			return spec
