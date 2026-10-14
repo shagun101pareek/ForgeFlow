@@ -9,15 +9,9 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthFrame } from "@/features/auth/auth-frame";
 import { getErrorMessage } from "@/lib/api-error";
 import { signupSchema, type SignupInput } from "@/lib/validators";
 import { signup } from "@/services/auth";
@@ -51,21 +45,22 @@ export function SignupForm() {
   });
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>
-            <h1>Create an account</h1>
-          </CardTitle>
-          <CardDescription>
-            Start a ForgeFlow project from a prompt.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-          >
+    <AuthFrame
+      title="Create an account"
+      description="Start a ForgeFlow project from a prompt."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className="text-foreground underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+      >
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -110,18 +105,10 @@ export function SignupForm() {
                 </p>
               ) : null}
             </div>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Creating account…" : "Sign up"}
-            </Button>
-          </form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="text-foreground underline">
-              Log in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Creating account…" : "Sign up"}
+        </Button>
+      </form>
+    </AuthFrame>
   );
 }

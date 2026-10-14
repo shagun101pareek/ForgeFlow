@@ -19,8 +19,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Wordmark } from "@/components/wordmark";
+import { examplePrompts } from "@/features/generation/example-prompts";
 import { getErrorMessage } from "@/lib/api-error";
 import type { GenerationPromptInput } from "@/lib/validators";
 import {
@@ -36,7 +44,7 @@ import {
   type GenerationSummary,
 } from "@/services/generation";
 import { ProjectImage } from "@/features/project/project-image";
-import { PublishDialog } from "@/features/project/publish-dialog";
+import { PublishDialog, repositoryURL } from "@/features/project/publish-dialog";
 import { SourceView } from "@/features/preview/source-view";
 import { getProject, updateProject } from "@/services/projects";
 import { useEditorStore } from "@/store/editor";
@@ -82,6 +90,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const pendingLossRef = useRef(pendingLoss);
   const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
+  const [publishOpen, setPublishOpen] = useState(false);
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
 
@@ -287,21 +296,13 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     }
   }
 
-  function showPreview() {
-    if (files.length === 0) {
-      toast("Generate a UI first");
-      return;
-    }
-    setCanvas("preview");
-    document.getElementById("forgeflow-preview")?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  }
-
   const showGenerating =
     generation.isPending ||
     (generationIsActive(latest.data?.status) && files.length === 0);
+
+  const publishDisabled =
+    !generationId || files.length === 0 || unsaved || showGenerating;
+  const repositoryHref = repositoryURL(githubUrl);
 
   const activeSections =
     specification?.pages.find((page) => page.route === activePage?.route)
@@ -321,7 +322,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         <p className="text-sm text-muted-foreground">
           {getErrorMessage(project.error, "This project could not be opened.")}
         </p>
-        <Button variant="outline" render={<Link href="/dashboard" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/dashboard" />}
+        >
           Back to projects
         </Button>
       </main>
@@ -331,12 +336,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
-        <Link
-          href="/dashboard"
-          className="text-sm font-semibold tracking-tight"
-        >
-          ForgeFlow
-        </Link>
+        <Wordmark href="/dashboard" />
         <form
           className="min-w-0 flex-1"
           onSubmit={(event) => {
@@ -354,37 +354,56 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           />
         </form>
         <div className="flex items-center gap-2">
-          <Button variant="outline" type="button" onClick={showPreview}>
-            Preview
-          </Button>
-          <PublishDialog
-            projectId={projectId}
-            generationId={generationId}
-            githubUrl={githubUrl}
-            disabled={!generationId || files.length === 0 || unsaved || showGenerating}
-            onPublished={setGithubUrl}
-          />
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => void saveEdit()}
-            disabled={!unsaved || saving || showGenerating || !generationId}
-          >
-            {saving ? "Saving…" : "Save"}
-          </Button>
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => void download()}
-            disabled={downloading || showGenerating || files.length === 0 || unsaved}
-          >
-            {downloading ? "Downloading…" : "Download"}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              Actions
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={!unsaved || saving || showGenerating || !generationId}
+                onClick={() => void saveEdit()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={downloading || showGenerating || files.length === 0 || unsaved}
+                onClick={() => void download()}
+              >
+                {downloading ? "Downloading…" : "Download"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={publishDisabled}
+                onClick={() => setPublishOpen(true)}
+              >
+                Publish
+              </DropdownMenuItem>
+              {repositoryHref ? (
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={
+                    <a href={repositoryHref} target="_blank" rel="noreferrer" />
+                  }
+                >
+                  Open repository
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button type="button" onClick={generate} disabled={showGenerating}>
             {showGenerating ? "Generating…" : "Generate"}
           </Button>
         </div>
       </header>
+      <PublishDialog
+        projectId={projectId}
+        generationId={generationId}
+        githubUrl={githubUrl}
+        disabled={publishDisabled}
+        onPublished={setGithubUrl}
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        hideTrigger
+      />
       <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
         <aside className="border-b p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
           <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -444,10 +463,10 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             </ul>
           ) : null}
         </aside>
-        <section className="flex min-h-[420px] flex-col gap-4 p-4 lg:min-h-0">
+        <section className="flex min-h-[420px] flex-col gap-4 bg-muted/40 p-4 lg:min-h-0">
           <div
             id="forgeflow-preview"
-            className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-xl border"
+            className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-lg"
           >
             {!showGenerating && !openingVersionId && files.length > 0 ? (
               <div className="flex gap-1 border-b p-2">
@@ -472,8 +491,15 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               </div>
             ) : null}
             {showGenerating || openingVersionId ? (
-              <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                {openingVersionId ? "Opening version…" : "Generating the interface…"}
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+                <p className="text-base font-medium">
+                  {openingVersionId ? "Opening this version" : "Generating the interface"}
+                </p>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  {openingVersionId
+                    ? "The preview will replace what is on the canvas."
+                    : "This usually takes a moment. The preview opens here when it is ready."}
+                </p>
               </div>
             ) : null}
             {!showGenerating && !openingVersionId && files.length > 0 && canvas === "preview" ? (
@@ -503,52 +529,59 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               </div>
             ) : null}
           </div>
-          <label className="flex flex-col gap-2 text-sm font-medium">
-            Prompt
+          <div className="rounded-xl border bg-card p-3">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {examplePrompts.map((example) => (
+                <button
+                  key={example.id}
+                  type="button"
+                  onClick={() => setPrompt(example.text)}
+                  className={`rounded-full px-2.5 py-1 text-xs ${example.tone}`}
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
             <Textarea
+              aria-label="Prompt"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder="Describe the interface you want to generate."
               className="min-h-24"
             />
-          </label>
+            <div className="mt-3 flex justify-end">
+              <Button type="button" onClick={generate} disabled={showGenerating}>
+                {showGenerating ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+          </div>
         </section>
         <aside className="border-t p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           <ProjectImage projectId={projectId} hasImage={Boolean(project.data.hasImage)} />
           <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Inspector
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {activeSections.length > 0
-              ? "Sections on this page."
-              : "Component details will show up here after a generation."}
+            This page
           </p>
           {activePage ? (
-            <dl className="mt-6 space-y-3 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Page</dt>
-                <dd>{activePage.name}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Route</dt>
-                <dd>{activePage.route}</dd>
-              </div>
+            <div className="text-sm">
+              <p className="font-medium">{activePage.name}</p>
+              <p className="mt-1 text-muted-foreground">{activePage.route}</p>
               {activeSections.length > 0 ? (
-                <div>
-                  <dt className="text-muted-foreground">Sections</dt>
-                  <dd>
-                    <ul className="mt-1 space-y-1">
-                      {activeSections.map((section, index) => (
-                        <li key={`${section.type}-${index}`}>
-                          {section.type}
-                          {section.title ? ` · ${section.title}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
+                <ul className="mt-4 space-y-2">
+                  {activeSections.map((section, index) => (
+                    <li key={`${section.type}-${index}`}>
+                      <span className="capitalize">{section.type}</span>
+                      {section.title ? (
+                        <span className="mt-0.5 block text-muted-foreground">
+                          {section.title}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-muted-foreground">No sections yet.</p>
+              )}
+            </div>
           ) : null}
         </aside>
       </div>
@@ -637,9 +670,11 @@ function VersionItem({
           {new Date(version.createdAt).toLocaleString()}
         </span>
       </button>
-      {running ? null : (
+      {selected && !running ? (
         <AlertDialog open={open} onOpenChange={setOpen}>
-          <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>
+          <AlertDialogTrigger
+            render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}
+          >
             Discard
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -662,7 +697,7 @@ function VersionItem({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      )}
+      ) : null}
     </li>
   );
 }

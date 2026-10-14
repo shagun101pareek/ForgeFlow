@@ -47,14 +47,21 @@ export function PublishDialog({
   githubUrl,
   disabled,
   onPublished,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
 }: {
   projectId: string;
   generationId: string | null;
   githubUrl: string;
   disabled: boolean;
   onPublished: (url: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = openProp ?? localOpen;
   const [token, setToken] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
@@ -62,7 +69,11 @@ export function PublishDialog({
   const url = publishedUrl ?? savedUrl;
 
   function close(nextOpen: boolean) {
-    setOpen(nextOpen);
+    if (onOpenChange) {
+      onOpenChange(nextOpen);
+    } else {
+      setLocalOpen(nextOpen);
+    }
     if (!nextOpen) {
       setToken("");
       setPublishedUrl(null);
@@ -98,25 +109,16 @@ export function PublishDialog({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      {savedUrl ? (
-        <a
-          href={savedUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="max-w-40 truncate text-sm underline"
-        >
-          {savedUrl.replace("https://github.com/", "")}
-        </a>
-      ) : null}
     <Dialog open={open} onOpenChange={close}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" type="button" disabled={disabled} />
-        }
-      >
-        GitHub
-      </DialogTrigger>
+      {hideTrigger ? null : (
+        <DialogTrigger
+          render={
+            <Button variant="outline" type="button" disabled={disabled} />
+          }
+        >
+          GitHub
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Publish to GitHub</DialogTitle>
@@ -174,6 +176,5 @@ export function PublishDialog({
         )}
       </DialogContent>
     </Dialog>
-    </div>
   );
 }
