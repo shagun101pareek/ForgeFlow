@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ import {
 import { createProject } from "@/services/projects";
 
 export function CreateProjectDialog() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const form = useForm<CreateProjectInput>({
@@ -36,11 +38,11 @@ export function CreateProjectDialog() {
 
   const mutation = useMutation({
     mutationFn: createProject,
-    onSuccess: async () => {
+    onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast.success("Project created");
       form.reset();
       setOpen(false);
+      router.push(`/projects/${project.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, "Could not create project"));

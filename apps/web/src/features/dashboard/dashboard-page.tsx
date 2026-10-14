@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,16 +15,23 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Wordmark } from "@/components/wordmark";
 import { getErrorMessage } from "@/lib/api-error";
 import { repositoryURL } from "@/features/project/publish-dialog";
 import { deleteProject, duplicateProject, listProjects } from "@/services/projects";
@@ -52,9 +60,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 border-b px-4 py-3 sm:px-6">
-        <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
-          ForgeFlow
-        </Link>
+        <Wordmark href="/dashboard" />
         <div className="flex items-center gap-2">
           <CreateProjectDialog />
           <AccountMenu />
@@ -62,7 +68,7 @@ export function DashboardPage() {
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+          <h1 className="font-heading text-4xl font-medium tracking-tight">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Open a project to enter the editor.
           </p>
@@ -76,10 +82,11 @@ export function DashboardPage() {
           </p>
         ) : null}
         {projects.data && projects.data.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-6 py-16 text-center">
+          <div className="flex flex-col items-start gap-4 py-8">
             <p className="text-sm text-muted-foreground">
-              No projects yet. Create one to start a workspace.
+              No projects yet. Create one to open the editor.
             </p>
+            <CreateProjectDialog />
           </div>
         ) : null}
         {projects.data && projects.data.length > 0 ? (
@@ -106,6 +113,18 @@ export function DashboardPage() {
       </main>
     </div>
   );
+}
+
+const projectTones = [
+  "bg-primary",
+  "bg-teal-600",
+  "bg-rose-500",
+  "bg-amber-600",
+];
+
+function projectTone(name: string) {
+  const total = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return projectTones[total % projectTones.length];
 }
 
 function projectMatches(project: Project, needle: string) {
@@ -135,22 +154,44 @@ function RepositoryLink({ url }: { url: string | undefined }) {
   );
 }
 
-function OutcomeLabel({ status }: { status: string | undefined }) {
+function StatusBadge({ status }: { status: string | undefined }) {
   if (status === "queued" || status === "running") {
-    return <span className="font-medium">Running. </span>;
+    return <Badge variant="secondary">Running</Badge>;
   }
   if (status === "failed") {
-    return <span className="font-medium text-destructive">Failed. </span>;
+    return <Badge variant="destructive">Failed</Badge>;
+  }
+  if (status === "completed") {
+    return <Badge variant="outline">Ready</Badge>;
   }
   return null;
+}
+
+function relativeTime(value: string) {
+  const seconds = Math.round((Date.now() - new Date(value).getTime()) / 1000);
+  if (seconds < 60) {
+    return "just now";
+  }
+  const ranges: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ["year", 60 * 60 * 24 * 365],
+    ["month", 60 * 60 * 24 * 30],
+    ["day", 60 * 60 * 24],
+    ["hour", 60 * 60],
+    ["minute", 60],
+  ];
+  const format = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  for (const [unit, size] of ranges) {
+    if (seconds >= size) {
+      return format.format(-Math.round(seconds / size), unit);
+    }
+  }
+  return "just now";
 }
 
 function ProjectCard({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const updated = project.updatedAt
-    ? new Date(project.updatedAt).toLocaleString()
-    : null;
+  const updated = project.updatedAt ? relativeTime(project.updatedAt) : null;
 
   const duplicate = useMutation({
     mutationFn: () => duplicateProject(project.id),
@@ -181,7 +222,14 @@ function ProjectCard({ project }: { project: Project }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <Link href={`/projects/${project.id}`} className="block">
-              <CardTitle className="truncate">{project.name}</CardTitle>
+              <span
+                aria-hidden="true"
+                className={`mb-3 block h-1.5 w-10 rounded-full ${projectTone(project.name)}`}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="truncate">{project.name}</CardTitle>
+                <StatusBadge status={project.latestStatus} />
+              </div>
               {project.description ? (
                 <CardDescription className="mt-1 line-clamp-2">
                   {project.description}
@@ -192,7 +240,6 @@ function ProjectCard({ project }: { project: Project }) {
                   project.latestPrompt ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                <OutcomeLabel status={project.latestStatus} />
                 {project.latestPrompt ?? "Nothing generated yet."}
               </p>
               {updated ? (
@@ -203,22 +250,35 @@ function ProjectCard({ project }: { project: Project }) {
             </Link>
             <RepositoryLink url={project.latestRepository} />
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={() => duplicate.mutate()}
-              disabled={duplicate.isPending || mutation.isPending}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Actions for ${project.name}`}
+                />
+              }
             >
-              {duplicate.isPending ? "Copying…" : "Duplicate"}
-            </Button>
-            <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogTrigger
-              render={<Button variant="ghost" size="sm" disabled={duplicate.isPending} />}
-            >
-              Delete
-            </AlertDialogTrigger>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={duplicate.isPending || mutation.isPending}
+                onClick={() => duplicate.mutate()}
+              >
+                {duplicate.isPending ? "Copying…" : "Duplicate"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={duplicate.isPending || mutation.isPending}
+                onClick={() => setOpen(true)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialog open={open} onOpenChange={setOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete {project.name}?</AlertDialogTitle>
@@ -237,8 +297,7 @@ function ProjectCard({ project }: { project: Project }) {
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          </AlertDialog>
         </div>
       </CardHeader>
     </Card>

@@ -19,9 +19,15 @@ export function HomeActions() {
   }, [hasHydrated, router, token]);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3">
-      <Button render={<Link href="/signup" />}>Create an account</Button>
-      <Button variant="outline" render={<Link href="/login" />}>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button nativeButton={false} render={<Link href="/signup" />}>
+        Create an account
+      </Button>
+      <Button
+        variant="outline"
+        nativeButton={false}
+        render={<Link href="/login" />}
+      >
         Log in
       </Button>
     </div>

@@ -9,15 +9,9 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthFrame } from "@/features/auth/auth-frame";
 import { getErrorMessage } from "@/lib/api-error";
 import { loginSchema, type LoginInput } from "@/lib/validators";
 import { login } from "@/services/auth";
@@ -51,19 +45,22 @@ export function LoginForm() {
   });
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>
-            <h1>Log in</h1>
-          </CardTitle>
-          <CardDescription>Open your ForgeFlow projects.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-          >
+    <AuthFrame
+      title="Log in"
+      description="Open your ForgeFlow projects."
+      footer={
+        <>
+          New to ForgeFlow?{" "}
+          <Link href="/signup" className="text-foreground underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+      >
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -94,18 +91,10 @@ export function LoginForm() {
                 </p>
               ) : null}
             </div>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Logging in…" : "Log in"}
-            </Button>
-          </form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            New to ForgeFlow?{" "}
-            <Link href="/signup" className="text-foreground underline">
-              Create an account
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Logging in…" : "Log in"}
+        </Button>
+      </form>
+    </AuthFrame>
   );
 }
