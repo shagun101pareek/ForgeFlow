@@ -82,11 +82,15 @@ export function DashboardPage() {
           </p>
         ) : null}
         {projects.data && projects.data.length === 0 ? (
-          <div className="flex flex-col items-start gap-4 py-8">
-            <p className="text-sm text-muted-foreground">
-              No projects yet. Create one to open the editor.
+          <div className="max-w-lg py-10">
+            <p className="font-heading text-3xl font-medium">No projects yet</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Create one and the editor will offer a landing page, a dashboard, a
+              portfolio, or a pricing page to generate.
             </p>
-            <CreateProjectDialog />
+            <div className="mt-6">
+              <CreateProjectDialog />
+            </div>
           </div>
         ) : null}
         {projects.data && projects.data.length > 0 ? (

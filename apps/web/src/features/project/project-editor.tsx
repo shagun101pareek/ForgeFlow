@@ -181,8 +181,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     },
   });
 
-  function generate() {
-    const nextPrompt = prompt.trim();
+  function generate(override?: string) {
+    const nextPrompt = (override ?? prompt).trim();
     if (!nextPrompt) {
       toast.error("Enter a prompt first");
       return;
@@ -389,7 +389,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button type="button" onClick={generate} disabled={showGenerating}>
+          <Button type="button" onClick={() => generate()} disabled={showGenerating}>
             {showGenerating ? "Generating…" : "Generate"}
           </Button>
         </div>
@@ -518,15 +518,41 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               />
             ) : null}
             {!showGenerating && !openingVersionId && files.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-                <p className="text-sm font-medium">
-                  {generationError ? "Generation failed" : activePage?.name}
-                </p>
-                <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                  {generationError ??
-                    "Describe an interface below, then generate it. The preview will run here."}
-                </p>
-              </div>
+              generationError ? (
+                <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+                  <p className="font-heading text-2xl font-medium">Generation failed</p>
+                  <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                    {generationError}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-1 flex-col justify-center gap-5 px-6 py-10">
+                  <div>
+                    <p className="font-heading text-3xl font-medium">Start from a layout</p>
+                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                      Pick one and the preview starts. You can still edit the prompt below.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {examplePrompts.map((example) => (
+                      <button
+                        key={example.id}
+                        type="button"
+                        onClick={() => {
+                          setPrompt(example.text);
+                          generate(example.text);
+                        }}
+                        className={`rounded-2xl p-4 text-left ${example.tone}`}
+                      >
+                        <span className="font-heading text-xl">{example.label}</span>
+                        <span className="mt-2 block text-sm leading-6 opacity-80">
+                          {example.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
             ) : null}
           </div>
           <div className="rounded-xl border bg-card p-3">
@@ -536,7 +562,9 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
                   key={example.id}
                   type="button"
                   onClick={() => setPrompt(example.text)}
-                  className={`rounded-full px-2.5 py-1 text-xs ${example.tone}`}
+                  className={`rounded-full px-2.5 py-1 text-xs ${example.tone} ${
+                    prompt === example.text ? "ring-2 ring-foreground" : ""
+                  }`}
                 >
                   {example.label}
                 </button>
@@ -550,7 +578,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               className="min-h-24"
             />
             <div className="mt-3 flex justify-end">
-              <Button type="button" onClick={generate} disabled={showGenerating}>
+              <Button type="button" onClick={() => generate()} disabled={showGenerating}>
                 {showGenerating ? "Generating…" : "Generate"}
               </Button>
             </div>
