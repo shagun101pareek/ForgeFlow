@@ -9,7 +9,7 @@ export const examplePrompts = [
     id: "dashboard",
     label: "Dashboard",
     tone: "bg-teal-100 text-teal-950 dark:bg-teal-950/50 dark:text-teal-100",
-    text: "Build a product dashboard for a team workspace, with a navbar, summary stats, recent projects, and a clear next action.",
+    text: "Build a product dashboard for a team workspace, with a dark navbar, summary stats, recent projects, and a clear next action.",
   },
   {
     id: "portfolio",
@@ -21,6 +21,6 @@ export const examplePrompts = [
     id: "pricing",
     label: "Pricing",
     tone: "bg-amber-100 text-amber-950 dark:bg-amber-950/50 dark:text-amber-100",
-    text: "Build a pricing page with three plans, a short comparison, and a signup form for the chosen plan.",
+    text: "Build a pricing page with three plans, a short FAQ, and a signup form for the chosen plan.",
   },
 ] as const;

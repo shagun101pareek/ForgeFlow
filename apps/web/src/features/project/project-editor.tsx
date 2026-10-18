@@ -26,9 +26,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Progress,
+  ProgressLabel,
+  ProgressValue,
+} from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Wordmark } from "@/components/wordmark";
 import { examplePrompts } from "@/features/generation/example-prompts";
+import {
+  GENERATION_PHASES,
+  generationPhase,
+} from "@/features/generation/generation-phases";
+import { SourceView } from "@/features/preview/source-view";
+import { ProjectImage } from "@/features/project/project-image";
+import { PublishDialog, repositoryURL } from "@/features/project/publish-dialog";
 import { getErrorMessage } from "@/lib/api-error";
 import type { GenerationPromptInput } from "@/lib/validators";
 import {
@@ -43,9 +55,6 @@ import {
   waitForGeneration,
   type GenerationSummary,
 } from "@/services/generation";
-import { ProjectImage } from "@/features/project/project-image";
-import { PublishDialog, repositoryURL } from "@/features/project/publish-dialog";
-import { SourceView } from "@/features/preview/source-view";
 import { getProject, updateProject } from "@/services/projects";
 import { useEditorStore } from "@/store/editor";
 
@@ -91,6 +100,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [phaseNow, setPhaseNow] = useState(() => Date.now());
+  const generateStartedAt = useRef<number | null>(null);
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
 
@@ -300,6 +311,28 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     generation.isPending ||
     (generationIsActive(latest.data?.status) && files.length === 0);
 
+  useEffect(() => {
+    if (!showGenerating) {
+      generateStartedAt.current = null;
+      return;
+    }
+    if (generateStartedAt.current === null) {
+      generateStartedAt.current = Date.now();
+    }
+    setPhaseNow(Date.now());
+    const id = window.setInterval(() => setPhaseNow(Date.now()), 400);
+    return () => window.clearInterval(id);
+  }, [showGenerating]);
+
+  const activeStatus = generation.isPending
+    ? (latest.data?.status ?? "queued")
+    : latest.data?.status;
+  const phase = generationPhase(
+    activeStatus,
+    generateStartedAt.current,
+    phaseNow,
+  );
+
   const publishDisabled =
     !generationId || files.length === 0 || unsaved || showGenerating;
   const repositoryHref = repositoryURL(githubUrl);
@@ -390,7 +423,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button type="button" onClick={() => generate()} disabled={showGenerating}>
-            {showGenerating ? "Generating…" : "Generate"}
+            {showGenerating ? phase.label : "Generate"}
           </Button>
         </div>
       </header>
@@ -491,15 +524,52 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               </div>
             ) : null}
             {showGenerating || openingVersionId ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                <p className="text-base font-medium">
-                  {openingVersionId ? "Opening this version" : "Generating the interface"}
-                </p>
-                <p className="max-w-sm text-sm text-muted-foreground">
-                  {openingVersionId
-                    ? "The preview will replace what is on the canvas."
-                    : "This usually takes a moment. The preview opens here when it is ready."}
-                </p>
+              <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+                {openingVersionId ? (
+                  <>
+                    <p className="text-base font-medium">Opening this version</p>
+                    <p className="max-w-sm text-sm text-muted-foreground">
+                      The preview will replace what is on the canvas.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-full max-w-md">
+                      <Progress value={phase.progress} className="w-full">
+                        <ProgressLabel>{phase.label}</ProgressLabel>
+                        <ProgressValue />
+                      </Progress>
+                    </div>
+                    <ol className="flex w-full max-w-md flex-col gap-2 text-left sm:flex-row sm:justify-between">
+                      {GENERATION_PHASES.map((label, index) => {
+                        const done = index < phase.index;
+                        const current = index === phase.index;
+                        return (
+                          <li
+                            key={label}
+                            className={`text-xs transition-colors duration-300 ${
+                              current
+                                ? "font-medium text-foreground"
+                                : done
+                                  ? "text-foreground/70"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            <span
+                              className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle transition-colors duration-300 ${
+                                current || done ? "bg-primary" : "bg-muted-foreground/40"
+                              }`}
+                            />
+                            {label}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    <p className="max-w-sm text-sm text-muted-foreground">
+                      The preview opens here when it is ready.
+                    </p>
+                  </>
+                )}
               </div>
             ) : null}
             {!showGenerating && !openingVersionId && files.length > 0 && canvas === "preview" ? (
@@ -579,7 +649,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             />
             <div className="mt-3 flex justify-end">
               <Button type="button" onClick={() => generate()} disabled={showGenerating}>
-                {showGenerating ? "Generating…" : "Generate"}
+                {showGenerating ? phase.label : "Generate"}
               </Button>
             </div>
           </div>
@@ -641,8 +711,14 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
 }
 
 function versionStatusLabel(status: string) {
-  if (status === "completed") {
-    return "";
+  if (status === "completed" || status === "failed") {
+    return status === "failed" ? "Failed · " : "";
+  }
+  if (status === "queued") {
+    return "Understanding prompt · ";
+  }
+  if (status === "running") {
+    return "Writing React · ";
   }
   return `${status.charAt(0).toUpperCase()}${status.slice(1)} · `;
 }

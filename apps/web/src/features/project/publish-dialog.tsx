@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/api-error";
 import { publishGeneration } from "@/services/generation";
+
+const TOKEN_STORAGE_KEY = "forgeflow.github.pat";
+
+function readStoredToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredToken(value: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    if (value) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, value);
+    } else {
+      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore quota / private-mode failures.
+  }
+}
 
 export function repositoryURL(value: string) {
   try {
@@ -63,10 +91,22 @@ export function PublishDialog({
   const [localOpen, setLocalOpen] = useState(false);
   const open = openProp ?? localOpen;
   const [token, setToken] = useState("");
+  const [rememberToken, setRememberToken] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const savedUrl = repositoryURL(githubUrl);
   const url = publishedUrl ?? savedUrl;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const stored = readStoredToken();
+    if (stored) {
+      setToken(stored);
+      setRememberToken(true);
+    }
+  }, [open]);
 
   function close(nextOpen: boolean) {
     if (onOpenChange) {
@@ -75,8 +115,9 @@ export function PublishDialog({
       setLocalOpen(nextOpen);
     }
     if (!nextOpen) {
-      setToken("");
       setPublishedUrl(null);
+      const stored = readStoredToken();
+      setToken(stored);
     }
   }
 
@@ -86,7 +127,7 @@ export function PublishDialog({
     }
     const nextToken = token.trim();
     if (nextToken.length < 20) {
-      toast.error("Paste a GitHub personal access token");
+      toast.error("Paste a GitHub personal access token with the repo scope");
       return;
     }
     setPublishing(true);
@@ -97,7 +138,12 @@ export function PublishDialog({
         toast.error("GitHub did not return a repository url");
         return;
       }
-      setToken("");
+      if (rememberToken) {
+        writeStoredToken(nextToken);
+      } else {
+        writeStoredToken("");
+        setToken("");
+      }
       setPublishedUrl(nextUrl);
       onPublished(nextUrl);
       toast.success("Repository created");
@@ -123,8 +169,10 @@ export function PublishDialog({
         <DialogHeader>
           <DialogTitle>Publish to GitHub</DialogTitle>
           <DialogDescription>
-            Creates a private repository from this version. The token is used
-            once and is not saved.
+            Creates a private repository from this version. Use a classic
+            personal access token with the <span className="font-medium">repo</span>{" "}
+            scope. The token stays in this browser only if you choose to remember
+            it.
           </DialogDescription>
         </DialogHeader>
         {url ? (
@@ -136,7 +184,12 @@ export function PublishDialog({
           >
             {url}
           </a>
-        ) : null}
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No repository yet. Publish this version to create one under your
+            GitHub account.
+          </p>
+        )}
         {publishedUrl ? null : (
           <form
             className="flex flex-col gap-4"
@@ -151,6 +204,7 @@ export function PublishDialog({
                 id="github-token"
                 type="password"
                 autoComplete="off"
+                placeholder="ghp_…"
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
               />
@@ -164,8 +218,17 @@ export function PublishDialog({
                 >
                   GitHub token settings
                 </a>
-                .
+                . Fine-grained tokens need repository create permission.
               </p>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-foreground"
+                  checked={rememberToken}
+                  onChange={(event) => setRememberToken(event.target.checked)}
+                />
+                Remember this token on this device
+              </label>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={publishing || token.trim().length < 20}>

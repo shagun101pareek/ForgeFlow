@@ -20,12 +20,12 @@ func TestMockProviderReturnsExistingSpec(t *testing.T) {
 	}
 
 	types := sectionTypes(spec)
-	for _, want := range []string{"navbar", "hero", "features", "cta", "pricing", "signup", "footer"} {
+	for _, want := range []string{"navbar", "hero", "features", "testimonials", "cta", "pricing", "signup", "footer"} {
 		if !strings.Contains(types, want) {
 			t.Fatalf("spec missing %s in %s", want, types)
 		}
 	}
-	for _, absent := range []string{"testimonials", "faq", "stats"} {
+	for _, absent := range []string{"faq", "stats"} {
 		if strings.Contains(types, absent) {
 			t.Fatalf("default landing included %s", absent)
 		}
@@ -50,7 +50,10 @@ func TestPromptAddsRequestedSections(t *testing.T) {
 		t.Fatal(err)
 	}
 	plainTypes := sectionTypes(plain)
-	for _, absent := range []string{"testimonials", "faq", "stats"} {
+	if !strings.Contains(plainTypes, "testimonials") {
+		t.Fatalf("landing default missing testimonials in %s", plainTypes)
+	}
+	for _, absent := range []string{"faq", "stats"} {
 		if strings.Contains(plainTypes, absent) {
 			t.Fatalf("plain landing included %s", absent)
 		}
@@ -77,6 +80,14 @@ func TestPromptAddsRequestedSections(t *testing.T) {
 	if !strings.Contains(sectionTypes(dashboard), "stats") || themeClass(dashboard) != "theme-dashboard" {
 		t.Fatalf("dashboard = %s %s", themeClass(dashboard), sectionTypes(dashboard))
 	}
+
+	pricing, err := Mock{}.GenerateSpec(context.Background(), "Northstar", "A pricing page with three plans")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sectionTypes(pricing), "faq") || themeClass(pricing) != "theme-pricing" {
+		t.Fatalf("pricing = %s %s", themeClass(pricing), sectionTypes(pricing))
+	}
 }
 
 func TestMockProviderPatternsAreDeterministic(t *testing.T) {
@@ -84,12 +95,12 @@ func TestMockProviderPatternsAreDeterministic(t *testing.T) {
 		prompt string
 		want   string
 	}{
-		{prompt: "landing page", want: "Built for the first version"},
-		{prompt: "SaaS landing page with pricing", want: "Built for the first version"},
-		{prompt: "team dashboard", want: "Recent work"},
+		{prompt: "landing page", want: "Why teams switch"},
+		{prompt: "SaaS landing page with pricing", want: "Why teams switch"},
+		{prompt: "team dashboard", want: "What needs attention"},
 		{prompt: "design portfolio", want: "Selected projects"},
 		{prompt: "pricing page", want: "Start with a plan"},
-		{prompt: "something else", want: "Built for the first version"},
+		{prompt: "something else", want: "Why teams switch"},
 	}
 
 	for _, tc := range prompts {
@@ -182,7 +193,7 @@ func TestFeatureIntroUsesThePrompt(t *testing.T) {
 	if featureSubtitle(notes) == featureSubtitle(bakery) {
 		t.Fatal("two landing prompts shared a features sentence")
 	}
-	if featuresSection(notes).Title != "Built for the first version" {
+	if featuresSection(notes).Title != "Why teams switch" {
 		t.Fatalf("heading = %q", featuresSection(notes).Title)
 	}
 	if titles := featureTitles(notes); titles[0] != "Shared projects" || titles[1] != "Live preview" || titles[2] != "Clear plans" {

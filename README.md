@@ -1,20 +1,20 @@
 # ForgeFlow
 
-Generate production-ready interactive UI prototypes using AI.
+Generate interactive UI prototypes from a prompt: structured UI spec → React/CSS → live Sandpack preview.
 
-## Tech Stack
+## Tech stack
 
-- Next.js 16 + React 19 + Tailwind CSS + shadcn/ui
-- Go Fiber API
-- PostgreSQL + Redis + NATS
-- Turborepo + pnpm workspaces
+- **Web:** Next.js + React + Tailwind + Sandpack
+- **API:** Go Fiber
+- **Database:** PostgreSQL (required)
+- **Optional in Compose:** Redis and NATS are started for health checks / future workers; the app does not depend on them for generate → preview today
 
 ## Prerequisites
 
 - Node.js 22+
 - pnpm 11.20.0+
 - Go 1.26+
-- Docker Desktop (for Postgres / Redis / NATS)
+- Docker Desktop (Postgres on port 5433)
 
 ## Setup
 
@@ -25,25 +25,43 @@ cp apps/web/.env.example apps/web/.env.local
 docker compose up -d
 ```
 
+Apply migrations once (from `apps/api`):
+
+```bash
+cd apps/api && go run ./cmd/migrate
+```
+
 ## Develop
 
 ```bash
-# Frontend (http://localhost:3000)
-pnpm --filter web dev
-
-# Backend (http://localhost:8080)
+# API — http://localhost:8080
 cd apps/api && go run ./cmd/server
 
-# Or from the monorepo root (frontend only via turbo)
-pnpm dev
+# Web — http://localhost:3000
+pnpm --filter web dev
 ```
 
-## Useful endpoints
+Useful checks: `GET http://localhost:8080/health`, `GET http://localhost:8080/api/v1/`.
 
-- `GET http://localhost:8080/health`
-- `GET http://localhost:8080/api/v1/`
+## Generation providers
+
+| `GENERATION_PROVIDER` | Behavior |
+| --- | --- |
+| `mock` (default) | Deterministic layouts from the prompt (landing, dashboard, portfolio, pricing). No API key. |
+| `openai` | Uses `OPENAI_API_KEY` for the UI spec, then the same React codegen. |
+
+Set these in the root `.env` before starting the API.
+
+## 5-minute demo
+
+1. Start Docker, migrate, API, and web (above).
+2. Open http://localhost:3000 → **Sign up** → create a project.
+3. On the empty canvas, pick a layout card (**Landing**, **Dashboard**, **Portfolio**, or **Pricing**). Generation starts and the preview fills the canvas.
+4. Edit the prompt (try adding “testimonials”, “FAQ”, or “stats”), click **Generate**, then open an older version from the sidebar or **Discard** one.
+5. **Actions → Download** for a ZIP, or **Publish** with a GitHub personal access token (`repo` scope). The token can be remembered in this browser only.
 
 ## Notes
 
 - Always use `pnpm` in this repo (not `npm` / `npx`).
-- The API starts even if Postgres/Redis are down, but `/health` reports `degraded` until Docker services are healthy.
+- The API starts even if Postgres/Redis are down; `/health` reports `degraded` until Postgres is healthy.
+- Preview runs client-side in Sandpack; there is no separate preview microservice.

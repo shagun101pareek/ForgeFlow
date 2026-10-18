@@ -308,10 +308,15 @@ func pricingSpec(name string) Spec {
 }
 
 func shapeSpec(spec Spec, name, prompt string) Spec {
+	kind := classifyPrompt(prompt)
 	text := strings.ToLower(prompt)
-	wantTestimonials := strings.Contains(text, "testimonial") || strings.Contains(text, "quotes")
-	wantFAQ := strings.Contains(text, "faq") || strings.Contains(text, "question")
-	wantStats := strings.Contains(text, "stats") || strings.Contains(text, "statistics") || strings.Contains(text, "metrics")
+	// Layout defaults keep each card visually distinct; prompt words still add extras.
+	wantTestimonials := kind == "landing" || kind == "portfolio" ||
+		strings.Contains(text, "testimonial") || strings.Contains(text, "quotes")
+	wantFAQ := kind == "pricing" ||
+		strings.Contains(text, "faq") || strings.Contains(text, "question")
+	wantStats := kind == "dashboard" ||
+		strings.Contains(text, "stats") || strings.Contains(text, "statistics") || strings.Contains(text, "metrics")
 
 	if wantTestimonials {
 		spec = ensureSection(spec, "/", "features", testimonialSection(name))
@@ -325,10 +330,43 @@ func shapeSpec(spec Spec, name, prompt string) Spec {
 	}
 	if wantStats {
 		spec = ensureSection(spec, "/", "hero", statsSection())
+	} else if kind != "dashboard" {
+		spec = dropSection(spec, "stats")
 	}
+	spec = applyLayoutAccent(spec, kind)
 	spec = applyHeroCopy(spec, prompt)
 	spec = applyFeatureCards(spec, prompt)
 	return applyFeatureIntro(spec, prompt)
+}
+
+func applyLayoutAccent(spec Spec, kind string) Spec {
+	title := ""
+	switch kind {
+	case "dashboard":
+		title = "What needs attention"
+	case "portfolio":
+		title = "Selected projects"
+	case "pricing":
+		title = "Compare plans"
+	case "landing":
+		title = "Why teams switch"
+	}
+	if title == "" {
+		return spec
+	}
+	for i, page := range spec.Pages {
+		if page.Route != "/" {
+			continue
+		}
+		for j, section := range page.Sections {
+			if section.Type != "features" {
+				continue
+			}
+			spec.Pages[i].Sections[j].Title = title
+			return spec
+		}
+	}
+	return spec
 }
 
 const (
