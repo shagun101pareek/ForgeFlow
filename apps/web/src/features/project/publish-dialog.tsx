@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -97,27 +97,21 @@ export function PublishDialog({
   const savedUrl = repositoryURL(githubUrl);
   const url = publishedUrl ?? savedUrl;
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const stored = readStoredToken();
-    if (stored) {
-      setToken(stored);
-      setRememberToken(true);
-    }
-  }, [open]);
-
   function close(nextOpen: boolean) {
+    if (nextOpen) {
+      const stored = readStoredToken();
+      setToken(stored);
+      if (stored) {
+        setRememberToken(true);
+      }
+    } else {
+      setPublishedUrl(null);
+      setToken(readStoredToken());
+    }
     if (onOpenChange) {
       onOpenChange(nextOpen);
     } else {
       setLocalOpen(nextOpen);
-    }
-    if (!nextOpen) {
-      setPublishedUrl(null);
-      const stored = readStoredToken();
-      setToken(stored);
     }
   }
 

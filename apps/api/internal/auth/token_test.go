@@ -11,7 +11,7 @@ import (
 func TestIssueAndParseToken(t *testing.T) {
 	userID := uuid.New()
 	secret := "test-secret"
-	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 
 	signed, err := IssueToken(secret, userID, now)
 	if err != nil {

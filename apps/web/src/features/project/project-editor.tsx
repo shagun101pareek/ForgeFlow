@@ -100,8 +100,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const [publishOpen, setPublishOpen] = useState(false);
-  const [phaseNow, setPhaseNow] = useState(() => Date.now());
-  const generateStartedAt = useRef<number | null>(null);
+  const [phaseSnapshot, setPhaseSnapshot] = useState<{
+    label: (typeof GENERATION_PHASES)[number];
+    index: number;
+    progress: number;
+  } | null>(null);
   const name = draftName ?? project.data?.name ?? "";
   const loadedProject = useRef<string | null>(null);
 
@@ -311,27 +314,31 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     generation.isPending ||
     (generationIsActive(latest.data?.status) && files.length === 0);
 
-  useEffect(() => {
-    if (!showGenerating) {
-      generateStartedAt.current = null;
-      return;
-    }
-    if (generateStartedAt.current === null) {
-      generateStartedAt.current = Date.now();
-    }
-    setPhaseNow(Date.now());
-    const id = window.setInterval(() => setPhaseNow(Date.now()), 400);
-    return () => window.clearInterval(id);
-  }, [showGenerating]);
-
   const activeStatus = generation.isPending
     ? (latest.data?.status ?? "queued")
     : latest.data?.status;
-  const phase = generationPhase(
-    activeStatus,
-    generateStartedAt.current,
-    phaseNow,
-  );
+
+  useEffect(() => {
+    if (!showGenerating) {
+      return;
+    }
+    const startedAt = Date.now();
+    let timeoutId = 0;
+    const tick = () => {
+      setPhaseSnapshot(generationPhase(activeStatus, startedAt, Date.now()));
+      timeoutId = window.setTimeout(tick, 400);
+    };
+    timeoutId = window.setTimeout(tick, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [showGenerating, activeStatus]);
+
+  const phase = showGenerating
+    ? (phaseSnapshot ?? {
+        label: GENERATION_PHASES[0],
+        index: 0,
+        progress: 8,
+      })
+    : { label: GENERATION_PHASES[0], index: 0, progress: 0 };
 
   const publishDisabled =
     !generationId || files.length === 0 || unsaved || showGenerating;
