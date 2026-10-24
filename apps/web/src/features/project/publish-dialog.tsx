@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -16,35 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/api-error";
+import { readGitHubToken, writeGitHubToken } from "@/lib/github-token";
 import { publishGeneration } from "@/services/generation";
-
-const TOKEN_STORAGE_KEY = "forgeflow.github.pat";
-
-function readStoredToken() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeStoredToken(value: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    if (value) {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, value);
-    } else {
-      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore quota / private-mode failures.
-  }
-}
 
 export function repositoryURL(value: string) {
   try {
@@ -99,14 +73,14 @@ export function PublishDialog({
 
   function close(nextOpen: boolean) {
     if (nextOpen) {
-      const stored = readStoredToken();
+      const stored = readGitHubToken();
       setToken(stored);
       if (stored) {
         setRememberToken(true);
       }
     } else {
       setPublishedUrl(null);
-      setToken(readStoredToken());
+      setToken(readGitHubToken());
     }
     if (onOpenChange) {
       onOpenChange(nextOpen);
@@ -133,9 +107,9 @@ export function PublishDialog({
         return;
       }
       if (rememberToken) {
-        writeStoredToken(nextToken);
+        writeGitHubToken(nextToken);
       } else {
-        writeStoredToken("");
+        writeGitHubToken("");
         setToken("");
       }
       setPublishedUrl(nextUrl);
@@ -164,9 +138,13 @@ export function PublishDialog({
           <DialogTitle>Publish to GitHub</DialogTitle>
           <DialogDescription>
             Creates a private repository from this version. Use a classic
-            personal access token with the <span className="font-medium">repo</span>{" "}
-            scope. The token stays in this browser only if you choose to remember
-            it.
+            personal access token with the{" "}
+            <span className="font-medium">repo</span> scope. Manage a saved
+            token in{" "}
+            <Link href="/settings" className="underline">
+              Settings
+            </Link>
+            .
           </DialogDescription>
         </DialogHeader>
         {url ? (
