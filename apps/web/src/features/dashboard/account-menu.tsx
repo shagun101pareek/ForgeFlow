@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { clearGitHubToken } from "@/lib/github-token";
 import { useAuthStore } from "@/store/auth";
 
 export function AccountMenu() {
@@ -23,6 +24,7 @@ export function AccountMenu() {
 
   function logOut() {
     clearAuth();
+    clearGitHubToken();
     queryClient.clear();
     router.replace("/login");
   }
@@ -37,6 +39,9 @@ export function AccountMenu() {
           <DropdownMenuLabel>{user?.email ?? "Signed in"}</DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
+          Settings
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={logOut}>Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
