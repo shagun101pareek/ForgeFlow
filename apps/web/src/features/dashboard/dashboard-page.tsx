@@ -77,9 +77,19 @@ export function DashboardPage() {
           <p className="text-sm text-muted-foreground">Loading projects…</p>
         ) : null}
         {projects.isError ? (
-          <p className="text-sm text-destructive">
-            {getErrorMessage(projects.error, "Could not load projects")}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-destructive">
+              {getErrorMessage(projects.error, "Could not load projects")}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void projects.refetch()}
+            >
+              Retry
+            </Button>
+          </div>
         ) : null}
         {projects.data && projects.data.length === 0 ? (
           <div className="max-w-lg py-10">
