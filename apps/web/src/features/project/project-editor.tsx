@@ -38,6 +38,7 @@ import {
   GENERATION_PHASES,
   generationPhase,
 } from "@/features/generation/generation-phases";
+import { AccountMenu } from "@/features/dashboard/account-menu";
 import { SourceView } from "@/features/preview/source-view";
 import { ProjectImage } from "@/features/project/project-image";
 import { PublishDialog, repositoryURL } from "@/features/project/publish-dialog";
@@ -432,6 +433,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <Button type="button" onClick={() => generate()} disabled={showGenerating}>
             {showGenerating ? phase.label : "Generate"}
           </Button>
+          <AccountMenu />
         </div>
       </header>
       <PublishDialog
@@ -595,41 +597,58 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               />
             ) : null}
             {!showGenerating && !openingVersionId && files.length === 0 ? (
-              generationError ? (
-                <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-                  <p className="font-heading text-2xl font-medium">Generation failed</p>
-                  <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                    {generationError}
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-1 flex-col justify-center gap-5 px-6 py-10">
-                  <div>
-                    <p className="font-heading text-3xl font-medium">Start from a layout</p>
-                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                      Pick one and the preview starts. You can still edit the prompt below.
+              <div className="flex flex-1 flex-col justify-center gap-5 px-6 py-10">
+                {generationError ? (
+                  <div className="max-w-md">
+                    <p className="font-heading text-2xl font-medium">
+                      Generation failed
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {generationError}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => generate()}
+                        disabled={!prompt.trim()}
+                      >
+                        Try again
+                      </Button>
+                    </div>
+                    <p className="mt-6 text-sm text-muted-foreground">
+                      Or start from a layout below.
                     </p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {examplePrompts.map((example) => (
-                      <button
-                        key={example.id}
-                        type="button"
-                        onClick={() => {
-                          setPrompt(example.text);
-                          generate(example.text);
-                        }}
-                        className={`rounded-2xl p-4 text-left ${example.tone}`}
-                      >
-                        <span className="font-heading text-xl">{example.label}</span>
-                        <span className="mt-2 block text-sm leading-6 opacity-80">
-                          {example.text}
-                        </span>
-                      </button>
-                    ))}
+                ) : (
+                  <div>
+                    <p className="font-heading text-3xl font-medium">
+                      Start from a layout
+                    </p>
+                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                      Pick one and the preview starts. You can still edit the
+                      prompt below.
+                    </p>
                   </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {examplePrompts.map((example) => (
+                    <button
+                      key={example.id}
+                      type="button"
+                      onClick={() => {
+                        setPrompt(example.text);
+                        generate(example.text);
+                      }}
+                      className={`rounded-2xl p-4 text-left ${example.tone}`}
+                    >
+                      <span className="font-heading text-xl">{example.label}</span>
+                      <span className="mt-2 block text-sm leading-6 opacity-80">
+                        {example.text}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )
+              </div>
             ) : null}
           </div>
           <div className="rounded-xl border bg-card p-3">

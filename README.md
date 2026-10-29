@@ -8,6 +8,7 @@ Generate interactive UI prototypes from a prompt: structured UI spec → React/C
 - **API:** Go Fiber
 - **Database:** PostgreSQL (required)
 - **Optional in Compose:** Redis and NATS are started for health checks / future workers; the app does not depend on them for generate → preview today
+- **CI:** GitHub Actions runs web typecheck/lint and Go vet/tests on PRs to `main`
 
 ## Prerequisites
 
@@ -28,7 +29,7 @@ docker compose up -d
 Apply migrations once (from `apps/api`):
 
 ```bash
-cd apps/api && go run ./cmd/migrate
+cd apps/api && go run ./cmd/migrate up
 ```
 
 ## Develop
@@ -58,10 +59,12 @@ Set these in the root `.env` before starting the API.
 2. Open http://localhost:3000 → **Sign up** → create a project.
 3. On the empty canvas, pick a layout card (**Landing**, **Dashboard**, **Portfolio**, or **Pricing**). Generation starts and the preview fills the canvas.
 4. Edit the prompt (try adding “testimonials”, “FAQ”, or “stats”), click **Generate**, then open an older version from the sidebar or **Discard** one.
-5. **Actions → Download** for a ZIP, or **Publish** with a GitHub personal access token (`repo` scope). The token can be remembered in this browser only.
+5. Optional: open **Account → Settings** and save a GitHub personal access token (`repo` scope) for this browser.
+6. **Actions → Download** for a ZIP, or **Publish** (uses the saved token when present).
 
 ## Notes
 
 - Always use `pnpm` in this repo (not `npm` / `npx`).
 - The API starts even if Postgres/Redis are down; `/health` reports `degraded` until Postgres is healthy.
 - Preview runs client-side in Sandpack; there is no separate preview microservice.
+- Settings stores the GitHub token in `localStorage` only on this device.
