@@ -1,7 +1,13 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import axios from "axios";
+import { PanelLeft, PanelRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -31,6 +37,14 @@ import {
   ProgressLabel,
   ProgressValue,
 } from "@/components/ui/progress";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Wordmark } from "@/components/wordmark";
 import { examplePrompts } from "@/features/generation/example-prompts";
@@ -57,7 +71,7 @@ import {
   type GenerationSummary,
 } from "@/services/generation";
 import { getProject, updateProject } from "@/services/projects";
-import { useEditorStore } from "@/store/editor";
+import { useEditorStore, type EditorPage } from "@/store/editor";
 
 const LivePreview = dynamic(
   () =>
@@ -101,6 +115,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const unsaved = JSON.stringify(files) !== savedFiles;
   const [canvas, setCanvas] = useState<"preview" | "source">("preview");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [phaseSnapshot, setPhaseSnapshot] = useState<{
     label: (typeof GENERATION_PHASES)[number];
     index: number;
@@ -333,6 +349,18 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     return () => window.clearTimeout(timeoutId);
   }, [showGenerating, activeStatus]);
 
+  useEffect(() => {
+    if (!unsaved) {
+      return;
+    }
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [unsaved]);
+
   const phase = showGenerating
     ? (phaseSnapshot ?? {
         label: GENERATION_PHASES[0],
@@ -340,6 +368,34 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         progress: 8,
       })
     : { label: GENERATION_PHASES[0], index: 0, progress: 0 };
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const meta = event.metaKey || event.ctrlKey;
+      if (!meta) {
+        return;
+      }
+      if (event.key === "Enter") {
+        if (showGenerating) {
+          return;
+        }
+        event.preventDefault();
+        generate();
+        return;
+      }
+      if (event.key.toLowerCase() === "s") {
+        if (!generationId || !unsaved || saving || showGenerating) {
+          return;
+        }
+        event.preventDefault();
+        void saveEdit();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // generate/saveEdit close over the latest editor state each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional shortcut binding
+  }, [showGenerating, generationId, unsaved, saving, prompt, projectId]);
 
   const publishDisabled =
     !generationId || files.length === 0 || unsaved || showGenerating;
@@ -351,8 +407,24 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
 
   if (project.isPending) {
     return (
-      <main className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        Loading project…
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-8">
+        <Skeleton className="h-9 w-48" />
+        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="mt-4 h-4 w-20" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+          <Skeleton className="min-h-[420px] w-full rounded-2xl" />
+          <div className="space-y-3">
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        </div>
       </main>
     );
   }
@@ -395,6 +467,72 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           />
         </form>
         <div className="flex items-center gap-2">
+          <Sheet open={navOpen} onOpenChange={setNavOpen}>
+            <SheetTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="lg:hidden"
+                  aria-label="Pages and versions"
+                />
+              }
+            >
+              <PanelLeft className="size-4" />
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[min(100%,20rem)] overflow-y-auto p-0">
+              <SheetHeader>
+                <SheetTitle>Pages & versions</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-6">
+                <EditorNavRail
+                  pages={pages}
+                  activePageId={activePage?.id}
+                  onSelectPage={(id) => {
+                    setActivePage(id);
+                    setNavOpen(false);
+                  }}
+                  versions={versions}
+                  generationId={generationId}
+                  openingVersionId={openingVersionId}
+                  onOpenVersion={(id) => {
+                    setNavOpen(false);
+                    requestOpenVersion(id);
+                  }}
+                  onDiscardVersion={discardVersion}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+            <SheetTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="lg:hidden"
+                  aria-label="Page details"
+                />
+              }
+            >
+              <PanelRight className="size-4" />
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[min(100%,20rem)] overflow-y-auto p-0">
+              <SheetHeader>
+                <SheetTitle>This page</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-6">
+                <EditorDetailsRail
+                  projectId={projectId}
+                  hasImage={Boolean(project.data.hasImage)}
+                  activePage={activePage}
+                  activeSections={activeSections}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
               Actions
@@ -447,68 +585,22 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         hideTrigger
       />
       <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
-        <aside className="border-b p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
-          <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Pages
-          </p>
-          <ul className="flex gap-2 overflow-x-auto lg:flex-col">
-            {pages.map((page) => {
-              const selected = page.id === activePage?.id;
-              return (
-                <li key={page.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActivePage(page.id)}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                      selected
-                        ? "bg-muted font-medium"
-                        : "hover:bg-muted/60"
-                    }`}
-                  >
-                    {page.name}
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {page.route}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-6 mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Versions
-          </p>
-          {versions.isPending ? (
-            <p className="text-sm text-muted-foreground">Loading versions…</p>
-          ) : null}
-          {versions.isError ? (
-            <p className="text-sm text-muted-foreground">
-              Versions could not be loaded.
-            </p>
-          ) : null}
-          {versions.data && versions.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Generated designs will be saved here.
-            </p>
-          ) : null}
-          {versions.data && versions.data.length > 0 ? (
-            <ul className="flex gap-2 overflow-x-auto lg:flex-col">
-              {versions.data.map((version) => (
-                <VersionItem
-                  key={version.id}
-                  version={version}
-                  selected={version.id === generationId}
-                  opening={openingVersionId === version.id}
-                  onOpen={() => requestOpenVersion(version.id)}
-                  onDiscard={() => discardVersion(version.id)}
-                />
-              ))}
-            </ul>
-          ) : null}
+        <aside className="hidden border-b p-4 lg:block lg:overflow-y-auto lg:border-r lg:border-b-0">
+          <EditorNavRail
+            pages={pages}
+            activePageId={activePage?.id}
+            onSelectPage={setActivePage}
+            versions={versions}
+            generationId={generationId}
+            openingVersionId={openingVersionId}
+            onOpenVersion={requestOpenVersion}
+            onDiscardVersion={discardVersion}
+          />
         </aside>
         <section className="flex min-h-[420px] flex-col gap-4 bg-muted/40 p-4 lg:min-h-0">
           <div
             id="forgeflow-preview"
-            className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-lg"
+            className="flex min-h-[min(70vh,560px)] flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-lg lg:min-h-[560px]"
           >
             {!showGenerating && !openingVersionId && files.length > 0 ? (
               <div className="flex gap-1 border-b p-2">
@@ -680,33 +772,13 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             </div>
           </div>
         </section>
-        <aside className="border-t p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
-          <ProjectImage projectId={projectId} hasImage={Boolean(project.data.hasImage)} />
-          <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            This page
-          </p>
-          {activePage ? (
-            <div className="text-sm">
-              <p className="font-medium">{activePage.name}</p>
-              <p className="mt-1 text-muted-foreground">{activePage.route}</p>
-              {activeSections.length > 0 ? (
-                <ul className="mt-4 space-y-2">
-                  {activeSections.map((section, index) => (
-                    <li key={`${section.type}-${index}`}>
-                      <span className="capitalize">{section.type}</span>
-                      {section.title ? (
-                        <span className="mt-0.5 block text-muted-foreground">
-                          {section.title}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-muted-foreground">No sections yet.</p>
-              )}
-            </div>
-          ) : null}
+        <aside className="hidden border-t p-4 lg:block lg:overflow-y-auto lg:border-t-0 lg:border-l">
+          <EditorDetailsRail
+            projectId={projectId}
+            hasImage={Boolean(project.data.hasImage)}
+            activePage={activePage}
+            activeSections={activeSections}
+          />
         </aside>
       </div>
       <AlertDialog
@@ -733,6 +805,131 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function EditorNavRail({
+  pages,
+  activePageId,
+  onSelectPage,
+  versions,
+  generationId,
+  openingVersionId,
+  onOpenVersion,
+  onDiscardVersion,
+}: {
+  pages: EditorPage[];
+  activePageId?: string;
+  onSelectPage: (id: string) => void;
+  versions: UseQueryResult<GenerationSummary[]>;
+  generationId: string | null;
+  openingVersionId: string | null;
+  onOpenVersion: (id: string) => void;
+  onDiscardVersion: (id: string) => Promise<void>;
+}) {
+  return (
+    <>
+      <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Pages
+      </p>
+      <ul className="flex flex-col gap-2">
+        {pages.map((page) => {
+          const selected = page.id === activePageId;
+          return (
+            <li key={page.id}>
+              <button
+                type="button"
+                onClick={() => onSelectPage(page.id)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                  selected ? "bg-muted font-medium" : "hover:bg-muted/60"
+                }`}
+              >
+                {page.name}
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {page.route}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-6 mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Versions
+      </p>
+      {versions.isPending ? (
+        <div className="space-y-2" aria-busy="true">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      ) : null}
+      {versions.isError ? (
+        <p className="text-sm text-muted-foreground">
+          Versions could not be loaded.
+        </p>
+      ) : null}
+      {versions.data && versions.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Generated designs will be saved here.
+        </p>
+      ) : null}
+      {versions.data && versions.data.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {versions.data.map((version) => (
+            <VersionItem
+              key={version.id}
+              version={version}
+              selected={version.id === generationId}
+              opening={openingVersionId === version.id}
+              onOpen={() => onOpenVersion(version.id)}
+              onDiscard={() => onDiscardVersion(version.id)}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+function EditorDetailsRail({
+  projectId,
+  hasImage,
+  activePage,
+  activeSections,
+}: {
+  projectId: string;
+  hasImage: boolean;
+  activePage?: EditorPage;
+  activeSections: { type: string; title?: string }[];
+}) {
+  return (
+    <>
+      <ProjectImage projectId={projectId} hasImage={hasImage} />
+      <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        This page
+      </p>
+      {activePage ? (
+        <div className="text-sm">
+          <p className="font-medium">{activePage.name}</p>
+          <p className="mt-1 text-muted-foreground">{activePage.route}</p>
+          {activeSections.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {activeSections.map((section, index) => (
+                <li key={`${section.type}-${index}`}>
+                  <span className="capitalize">{section.type}</span>
+                  {section.title ? (
+                    <span className="mt-0.5 block text-muted-foreground">
+                      {section.title}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-muted-foreground">No sections yet.</p>
+          )}
+        </div>
+      ) : null}
+    </>
   );
 }
 

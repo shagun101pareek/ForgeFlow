@@ -52,7 +52,7 @@ func main() {
 
 	redisClient, err := cache.NewRedisClient(ctx, cfg.RedisURL)
 	if err != nil {
-		log.Warn().Err(err).Msg("redis unavailable; starting in degraded mode")
+		log.Warn().Err(err).Msg("redis unavailable; continuing without it")
 	} else {
 		deps.Redis = redisClient
 		deps.RedisOK = true

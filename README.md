@@ -26,10 +26,11 @@ cp apps/web/.env.example apps/web/.env.local
 docker compose up -d
 ```
 
-Apply migrations once (from `apps/api`):
+Apply migrations once (works from any cwd; paths resolve from the API module):
 
 ```bash
 cd apps/api && go run ./cmd/migrate up
+# optional: go run ./cmd/migrate version
 ```
 
 ## Develop
@@ -65,6 +66,6 @@ Set these in the root `.env` before starting the API.
 ## Notes
 
 - Always use `pnpm` in this repo (not `npm` / `npx`).
-- The API starts even if Postgres/Redis are down; `/health` reports `degraded` until Postgres is healthy.
+- The API starts even if Postgres/Redis are down; `/health` and `/ready` require Postgres. Redis is reported but optional.
 - Preview runs client-side in Sandpack; there is no separate preview microservice.
 - Settings stores the GitHub token in `localStorage` only on this device.
