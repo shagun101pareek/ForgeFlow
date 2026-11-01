@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -31,11 +32,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Wordmark } from "@/components/wordmark";
 import { getErrorMessage } from "@/lib/api-error";
 import { repositoryURL } from "@/features/project/publish-dialog";
-import { deleteProject, duplicateProject, listProjects } from "@/services/projects";
-import type { Project } from "@/store/project";
+import {
+  deleteProject,
+  duplicateProject,
+  listProjects,
+  type Project,
+} from "@/services/projects";
 
 import { AccountMenu } from "./account-menu";
 import { CreateProjectDialog } from "./create-project-dialog";
@@ -74,7 +80,16 @@ export function DashboardPage() {
           </p>
         </div>
         {projects.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading projects…</p>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <li key={index} className="rounded-2xl border p-4">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="mt-3 h-4 w-full" />
+                <Skeleton className="mt-2 h-4 w-4/5" />
+                <Skeleton className="mt-4 h-3 w-1/3" />
+              </li>
+            ))}
+          </ul>
         ) : null}
         {projects.isError ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -203,15 +218,17 @@ function relativeTime(value: string) {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const updated = project.updatedAt ? relativeTime(project.updatedAt) : null;
 
   const duplicate = useMutation({
     mutationFn: () => duplicateProject(project.id),
-    onSuccess: async () => {
+    onSuccess: async (copied) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project duplicated");
+      router.push(`/projects/${copied.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, "Could not duplicate project"));

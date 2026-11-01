@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -13,10 +14,11 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 || os.Args[1] != "up" {
-		fmt.Fprintln(os.Stderr, "usage: migrate up")
+	if len(os.Args) != 2 {
+		usage()
 		os.Exit(1)
 	}
+	command := os.Args[1]
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -24,13 +26,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	wd, err := os.Getwd()
+	source, err := migrationsSource()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to resolve working directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to resolve migrations: %v\n", err)
 		os.Exit(1)
 	}
 
-	source := "file://" + filepath.ToSlash(filepath.Join(wd, "sql", "migrations"))
 	m, err := migrate.New(source, cfg.DatabaseURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create migrator: %v\n", err)
@@ -38,8 +39,52 @@ func main() {
 	}
 	defer m.Close()
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		fmt.Fprintf(os.Stderr, "migration failed: %v\n", err)
+	switch command {
+	case "up":
+		if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			fmt.Fprintf(os.Stderr, "migration failed: %v\n", err)
+			os.Exit(1)
+		}
+		printVersion(m)
+	case "version", "status":
+		printVersion(m)
+	default:
+		usage()
 		os.Exit(1)
 	}
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "usage: migrate <up|version|status>")
+}
+
+func printVersion(m *migrate.Migrate) {
+	version, dirty, err := m.Version()
+	if errors.Is(err, migrate.ErrNilVersion) {
+		fmt.Println("version: none")
+		return
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read version: %v\n", err)
+		os.Exit(1)
+	}
+	if dirty {
+		fmt.Printf("version: %d (dirty)\n", version)
+		return
+	}
+	fmt.Printf("version: %d\n", version)
+}
+
+func migrationsSource() (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", errors.New("could not locate migrate binary path")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
+	dir := filepath.Join(root, "sql", "migrations")
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return "", fmt.Errorf("migrations not found at %s", dir)
+	}
+	return "file://" + filepath.ToSlash(dir), nil
 }

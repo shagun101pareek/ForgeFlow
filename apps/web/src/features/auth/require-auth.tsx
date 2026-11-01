@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { me } from "@/services/auth";
 import { useAuthStore } from "@/store/auth";
 
@@ -12,6 +13,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const token = useAuthStore((state) => state.token);
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
 
   const profile = useQuery({
     queryKey: ["me", token],
@@ -27,16 +29,32 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }, [profile.data, setAuth, token]);
 
   useEffect(() => {
-    if (!hasHydrated || token) {
+    if (!hasHydrated) {
       return;
     }
-    router.replace("/login");
-  }, [hasHydrated, router, token]);
+    if (!token || profile.isError) {
+      if (profile.isError) {
+        clearAuth();
+      }
+      router.replace("/login");
+    }
+  }, [clearAuth, hasHydrated, profile.isError, router, token]);
 
-  if (!hasHydrated || !token) {
+  if (!hasHydrated || !token || profile.isPending) {
     return (
-      <main className="flex flex-1 items-center justify-center px-6 py-24 text-sm text-muted-foreground">
-        Loading account…
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-3 px-6 py-24">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </main>
+    );
+  }
+
+  if (profile.isError || !profile.data) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-3 px-6 py-24">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-4 w-full" />
       </main>
     );
   }

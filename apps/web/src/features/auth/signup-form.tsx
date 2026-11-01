@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthFrame } from "@/features/auth/auth-frame";
+import { PasswordField } from "@/features/auth/password-field";
 import { getErrorMessage } from "@/lib/api-error";
 import { signupSchema, type SignupInput } from "@/lib/validators";
 import { signup } from "@/services/auth";
@@ -92,12 +93,11 @@ export function SignupForm() {
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordField
                 id="password"
-                type="password"
                 autoComplete="new-password"
-                aria-invalid={Boolean(form.formState.errors.password)}
-                {...form.register("password")}
+                invalid={Boolean(form.formState.errors.password)}
+                registration={form.register("password")}
               />
               {form.formState.errors.password ? (
                 <p className="text-sm text-destructive">

@@ -12,6 +12,14 @@ import {
   uploadProjectImage,
 } from "@/services/projects";
 
+const MAX_IMAGE_BYTES = 1_000_000;
+const ALLOWED_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+]);
+
 export function ProjectImage({
   projectId,
   hasImage,
@@ -39,6 +47,14 @@ export function ProjectImage({
 
   async function onFile(file: File | undefined) {
     if (!file || busy) {
+      return;
+    }
+    if (!ALLOWED_TYPES.has(file.type)) {
+      toast.error("Use a PNG, JPEG, GIF, or WebP image");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Image must be at most 1 MB");
       return;
     }
     setBusy(true);
@@ -109,7 +125,8 @@ export function ProjectImage({
         ) : null}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Shown in the hero the next time you generate.
+        PNG, JPEG, GIF, or WebP up to 1 MB. Shown in the hero the next time you
+        generate.
       </p>
     </div>
   );

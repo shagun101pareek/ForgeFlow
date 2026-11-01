@@ -1,4 +1,4 @@
-.PHONY: run build tidy fmt vet test sqlc migrate-up
+.PHONY: run build tidy fmt vet test sqlc migrate-up migrate-version
 
 run:
 	go run ./cmd/server
@@ -23,3 +23,6 @@ sqlc:
 
 migrate-up:
 	go run ./cmd/migrate up
+
+migrate-version:
+	go run ./cmd/migrate version

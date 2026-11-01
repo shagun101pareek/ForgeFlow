@@ -42,8 +42,9 @@ func Register(app *fiber.App, deps Dependencies) {
 			"redis":    deps.RedisOK,
 		}
 
+		// Postgres is required. Redis is optional (health ping only; unused by app logic).
 		httpStatus := fiber.StatusOK
-		if !deps.DBReady || !deps.RedisOK {
+		if !deps.DBReady {
 			status["status"] = "degraded"
 			httpStatus = fiber.StatusServiceUnavailable
 		}
@@ -52,7 +53,7 @@ func Register(app *fiber.App, deps Dependencies) {
 	})
 
 	app.Get("/ready", func(c *fiber.Ctx) error {
-		if !deps.DBReady || !deps.RedisOK {
+		if !deps.DBReady {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"ready": false,
 			})

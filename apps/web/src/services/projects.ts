@@ -1,6 +1,16 @@
 import { api } from "@/lib/axios";
 import type { CreateProjectInput } from "@/lib/validators";
-import type { Project } from "@/store/project";
+
+export type Project = {
+  id: string;
+  name: string;
+  description?: string;
+  hasImage?: boolean;
+  latestPrompt?: string;
+  latestStatus?: string;
+  latestRepository?: string;
+  updatedAt?: string;
+};
 
 export async function listProjects() {
   const { data } = await api.get<Project[]>("/api/v1/projects");
