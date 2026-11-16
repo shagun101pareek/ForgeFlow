@@ -7,8 +7,8 @@ Generate interactive UI prototypes from a prompt: structured UI spec → React/C
 - **Web:** Next.js + React + Tailwind + Sandpack
 - **API:** Go Fiber
 - **Database:** PostgreSQL (required)
-- **Optional in Compose:** Redis and NATS are started for health checks / future workers; the app does not depend on them for generate → preview today
-- **CI:** GitHub Actions runs web typecheck/lint and Go vet/tests on PRs to `main`
+- **Optional:** Redis (Compose profile `redis` only; health ping, unused by app logic)
+- **CI:** GitHub Actions runs web typecheck/lint/build and Go vet/tests on PRs to `main`
 
 ## Prerequisites
 
@@ -26,7 +26,13 @@ cp apps/web/.env.example apps/web/.env.local
 docker compose up -d
 ```
 
-Apply migrations once (works from any cwd; paths resolve from the API module):
+That starts **Postgres only**. Optional Redis:
+
+```bash
+docker compose --profile redis up -d
+```
+
+Apply migrations once (paths resolve from the API module):
 
 ```bash
 cd apps/api && go run ./cmd/migrate up
@@ -66,6 +72,6 @@ Set these in the root `.env` before starting the API.
 ## Notes
 
 - Always use `pnpm` in this repo (not `npm` / `npx`).
-- The API starts even if Postgres/Redis are down; `/health` and `/ready` require Postgres. Redis is reported but optional.
+- `/health` and `/ready` require Postgres. Redis is reported when present but optional.
 - Preview runs client-side in Sandpack; there is no separate preview microservice.
 - Settings stores the GitHub token in `localStorage` only on this device.

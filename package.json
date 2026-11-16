@@ -8,9 +8,8 @@
     "dev": "turbo run dev",
     "dev:web": "turbo run dev --filter=web",
     "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json,yml,yaml}\""
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck"
   },
   "devDependencies": {
     "turbo": "^2.10.8"
