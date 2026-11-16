@@ -17,8 +17,6 @@ type Config struct {
 	JWTSecret          string
 	OpenAIKey          string
 	GenerationProvider string
-	NATSURL            string
-	S3Bucket           string
 }
 
 func Load() (*Config, error) {
@@ -35,8 +33,6 @@ func Load() (*Config, error) {
 		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production"),
 		OpenAIKey:          os.Getenv("OPENAI_API_KEY"),
 		GenerationProvider: strings.ToLower(getEnv("GENERATION_PROVIDER", "mock")),
-		NATSURL:            getEnv("NATS_URL", "nats://localhost:4222"),
-		S3Bucket:           getEnv("S3_BUCKET", "forgeflow-assets"),
 	}
 
 	if cfg.DatabaseURL == "" {

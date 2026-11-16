@@ -17,7 +17,9 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional. Start with: docker compose --profile redis up -d
   redis:
+    profiles: ["redis"]
     image: redis:7-alpine
     container_name: forgeflow-redis
     restart: unless-stopped
@@ -30,15 +32,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  nats:
-    image: nats:2-alpine
-    container_name: forgeflow-nats
-    restart: unless-stopped
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: ["-js", "-m", "8222"]
 
 volumes:
   forgeflow_postgres_data:
